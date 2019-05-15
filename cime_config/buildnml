@@ -1,0 +1,200 @@
+#!/usr/bin/env python
+
+"""OCPL namelist creator
+"""
+
+# Typically ignore this.
+# pylint: disable=invalid-name
+
+# Disable these because this is our standard setup
+# pylint: disable=wildcard-import,unused-wildcard-import,wrong-import-position
+
+import os, shutil, sys, glob, stat, filecmp, imp
+
+CIMEROOT = os.environ.get("CIMEROOT")
+if CIMEROOT is None:
+    raise SystemExit("ERROR: must set CIMEROOT environment variable")
+sys.path.append(os.path.join(CIMEROOT, "scripts", "Tools"))
+
+from standard_script_setup import *
+from CIME.case import Case
+from CIME.nmlgen import NamelistGenerator
+from CIME.utils import expect
+from CIME.buildnml import create_namelist_infile, parse_input
+from CIME.utils import run_cmd, run_sub_or_cmd
+
+# sys.path.append(os.path.join(CIMEROOT, "components", "roms","cime_config"))
+# from CIMEROMS.buildnml import buildnml as buildnml_roms
+
+logger = logging.getLogger(__name__)
+
+# pylint: disable=too-many-arguments,too-many-locals,too-many-branches,too-many-statements
+####################################################################################
+def _create_namelists(case, confdir, infile, nmlgen):
+####################################################################################
+    """Write out the namelist for this component.
+
+    Most arguments are the same as those for `NamelistGenerator`.
+    The `confdir` argument is used to specify the directory  in which output files will be placed.
+    """
+    #----------------------------------------------------
+    # Clear out old data.
+    #----------------------------------------------------
+    data_list_path = os.path.join(case.get_case_root(), "Buildconf", "ocpl.input_data_list")
+    if os.path.exists(data_list_path):
+        os.remove(data_list_path)
+
+    #----------------------------------------------------
+    # Create config dictionary
+    #----------------------------------------------------
+    config = {}
+
+    #----------------------------------------------------
+    # Initialize namelist defaults
+    #----------------------------------------------------
+    nmlgen.init_defaults(infile, config)
+
+    #----------------------------------------------------
+    # Write out namelist groups
+    #----------------------------------------------------
+    groups=['ocpl_nml']
+
+    namelist_file = os.path.join(confdir, "ocpl_in")
+    nmlgen.write_output_file(namelist_file, data_list_path, groups=groups, sorted_groups=False)
+
+###############################################################################
+def buildnml(case, caseroot, compname):
+###############################################################################
+    """Build the ocpl namelist """
+
+    # Build the component namelist 
+    if compname != "ocpl":
+        raise AttributeError
+
+    cimeroot = case.get_value("CIMEROOT")
+    srcroot = case.get_value("SRCROOT")
+    exeroot = case.get_value("EXEROOT")
+    continue_run = case.get_value("CONTINUE_RUN")
+    casename = case.get_value("CASE")
+    get_refcase = case.get_value("GET_REF_CASE")
+    ninst = case.get_value("NINST_OCN")
+    ocn_grid = case.get_value("OCN_GRID")
+    run_type = case.get_value("RUN_TYPE")
+    run_refcase = case.get_value("RUN_REF CASE")
+    run_refdate = case.get_value("RUN_REFDATE")
+    rundir = case.get_value("RUNDIR")
+    testcase = case.get_value("TESTCASE")
+    ntasks_atm = case.get_value("NTASKS_ATM")
+    startdate = case.get_value("RUN_STARTDATE")
+    starttod = case.get_value("START_TOD")
+    stopoption = case.get_value("STOP_OPTION")
+    stopn = case.get_value("STOP_N")
+    dinlocroot = case.get_value("DIN_LOC_ROOT")
+    ntasks = case.get_value("NTASKS_OCN")
+
+    # determine the confdir directory
+    confdir = os.path.join(caseroot,"Buildconf","ocplconf")
+    if not os.path.isdir(confdir):
+        os.makedirs(confdir)
+
+    logger.info("-----------------------------------------------------------------")
+    logger.info("ocpl buildnml calling pop buildnml...")
+    logger.info("-----------------------------------------------------------------")
+
+    #--- get user_nl_pop into CASEDIR ---
+    file = os.path.join(caseroot,"user_nl_pop")
+    if not os.path.isfile(file):
+       file = os.path.join(CIMEROOT,"..","components", "pop","cime_config","user_nl_pop")
+       cmd = "cp " + file + " " + caseroot
+       run_cmd(cmd)
+
+    #--- call pop's buildnml ---
+    cmd = os.path.join(CIMEROOT,"..","components", "pop","cime_config","buildnml")
+    caseroot = case.get_value("CASEROOT")
+    compname = "ocn"
+    stat,_,_ = run_sub_or_cmd(cmd, (caseroot), "buildnml", (case, caseroot, compname), case=case)
+    expect(stat == 0, "pop buildnml failure")
+
+    logger.info("-----------------------------------------------------------------")
+    logger.info("ocpl buildnml calling roms buildnml...")
+    logger.info("-----------------------------------------------------------------")
+
+    #--- get user_nl_roms into CASEDIR ---
+    file = os.path.join(caseroot,"user_nl_roms")
+    if not os.path.isfile(file):
+       file = os.path.join(CIMEROOT,"..","components", "roms","cime_config","user_nl_roms")
+       cmd = "cp " + file + " " + caseroot
+       run_cmd(cmd)
+
+    #--- call roms' buildnml ---
+    cmd = os.path.join(CIMEROOT,"..","components", "roms","cime_config","buildnml")
+    caseroot = case.get_value("CASEROOT")
+    compname = "ocn"
+    stat,_,_ = run_sub_or_cmd(cmd, (caseroot), "buildnml", (case, caseroot, compname), case=case)
+    expect(stat == 0, "roms buildnml failure")
+
+    logger.info("-----------------------------------------------------------------")
+    logger.info("ocpl buildnml building ocpl namelist...")
+    logger.info("-----------------------------------------------------------------")
+
+    #----------------------------------------------------
+    # Construct the namelist generator 
+    #----------------------------------------------------
+    # determine directory for user modified namelist_definitions.xml and namelist_defaults.xml
+    user_xml_dir = os.path.join(caseroot, "SourceMods", "src.ocpl")
+    expect (os.path.isdir(user_xml_dir),
+            "user_xml_dir %s does not exist " %user_xml_dir)
+
+    # user definition *replaces* existing definition.
+    namelist_xml_dir = os.path.join(srcroot, "components", "ocpl", "cime_config")
+    definition_file = [os.path.join(namelist_xml_dir, "namelist_definition_ocpl.xml")]
+    user_definition = os.path.join(user_xml_dir, "namelist_definition_ocpl.xml")
+    if os.path.isfile(user_definition):
+        definition_file = [user_definition]
+    for file_ in definition_file:
+        expect(os.path.isfile(file_), "Namelist XML file %s not found!" % file_)
+
+    # Create the namelist generator object - independent of instance
+    nmlgen = NamelistGenerator(case, definition_file)
+
+    #----------------------------------------------------
+    # Loop over instances
+    #----------------------------------------------------
+    for inst_counter in range(1, ninst+1):
+
+        # determine instance string
+        inst_string = ""
+        if ninst > 1:
+            inst_string = '_' + '%04d' % inst_counter
+
+        # create namelist_infile using user_nl_file as input
+        user_nl_file = os.path.join(caseroot, "user_nl_ocpl" + inst_string)
+        expect(os.path.isfile(user_nl_file),
+               "Missing required user_nl_file %s " %(user_nl_file))
+        infile = os.path.join(confdir, "namelist_infile")
+        create_namelist_infile(case, user_nl_file, infile)
+        namelist_infile = [infile]
+
+        # create namelist 
+        _create_namelists(case, confdir, namelist_infile, nmlgen)
+
+        # copy namelist files to rundir
+        if os.path.isdir(rundir):
+            file1  = os.path.join(confdir, "ocpl_in")
+            file2 = os.path.join(rundir, "ocpl_in")
+            if inst_string:
+                file2 += inst_string
+            logger.debug("OCPL namelist copy: file1 %s file2 %s " %(file1, file2))
+            shutil.copy2(file1, file2)
+
+###############################################################################
+def _main_func():
+
+    caseroot = parse_input(sys.argv)
+
+    with Case(caseroot) as case:
+        buildnml(case, caseroot, "ocpl")
+
+if __name__ == "__main__":
+    _main_func()
+

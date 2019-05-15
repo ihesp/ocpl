@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+
+<?xml-stylesheet type="text/xsl" href="namelist_definition.xsl"?>
+
+<entry_id version="2.0">
+
+  <!--
+      Values to use by default for creation of ocpl model namelists.
+      Currently ocpl doesn't need any namelist input
+  -->
+
+  <entry id="foobar">
+    <type>real</type>
+    <category>ocpl</category>
+    <group>ocpl_nml</group>
+    <desc>
+      not needed, just an example of a namelist variable
+    </desc>
+    <values>
+      <value>123.4</value>
+    </values>
+  </entry>
+
+</entry_id>

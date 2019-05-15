@@ -1,0 +1,12 @@
+================================================================================
+Tag name: master_190515
+Originator(s): kauff
+Date: 2019 May 15
+One-line Summary: initial code import
+
+early development code migrated from RomsInPop branch of 
+https://github.com/NCAR/TAMURegionalCESM/ 
+to https://github.com/ihesp
+as the home repo (home github organization) for this project has moved from NCAR to ihesp
+
+================================================================================
