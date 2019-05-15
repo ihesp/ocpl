@@ -1,5 +1,5 @@
 ==================================
- iocpl -- a CESM Ocean-Coupler Component
+ocpl -- a CESM Ocean-Coupler Component
 ==================================
 
 The "ocean-coupler" (ocpl) is a cesm ocean component that connects to the standard cesm2.1 coupler.  
