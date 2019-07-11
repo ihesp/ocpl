@@ -112,8 +112,9 @@ def buildnml(case, caseroot, compname):
     cmd = os.path.join(CIMEROOT,"..","components", "pop","cime_config","buildnml")
     caseroot = case.get_value("CASEROOT")
     compname = "ocn"
-    stat,_,_ = run_sub_or_cmd(cmd, (caseroot), "buildnml", (case, caseroot, compname), case=case)
-    expect(stat == 0, "pop buildnml failure")
+#   stat,_,_ = run_sub_or_cmd(cmd, (caseroot), "buildnml", (case, caseroot, compname), case=case)
+    run_sub_or_cmd(cmd, (caseroot), "buildnml", (case, caseroot, compname), case=case)
+#   expect(stat == 0, "pop buildnml failure")
 
     logger.info("-----------------------------------------------------------------")
     logger.info("ocpl buildnml calling roms buildnml...")
@@ -130,8 +131,9 @@ def buildnml(case, caseroot, compname):
     cmd = os.path.join(CIMEROOT,"..","components", "roms","cime_config","buildnml")
     caseroot = case.get_value("CASEROOT")
     compname = "ocn"
-    stat,_,_ = run_sub_or_cmd(cmd, (caseroot), "buildnml", (case, caseroot, compname), case=case)
-    expect(stat == 0, "roms buildnml failure")
+#   stat,_,_ = run_sub_or_cmd(cmd, (caseroot), "buildnml", (case, caseroot, compname), case=case)
+    run_sub_or_cmd(cmd, (caseroot), "buildnml", (case, caseroot, compname), case=case)
+#   expect(stat == 0, "roms buildnml failure")
 
     logger.info("-----------------------------------------------------------------")
     logger.info("ocpl buildnml building ocpl namelist...")

@@ -50,9 +50,10 @@ def _build_ocpl():
        print("<ocpl:_build_ocpl> my_file     = %s" % my_file   )
        print("<ocpl:_build_ocpl> cmd_lin_args= %s" % cmd_line_args)
 
-       rc,stdout,stderr = run_sub_or_cmd(my_file, [cmd_line_args                      ], 
-                                       'dontfind',[bldroot      , libroot   , caseroot])
-       expect(rc == 0, "pop buildlib failure")
+       run_sub_or_cmd(my_file, [cmd_line_args],'dontfind',[bldroot,libroot,caseroot])
+#      rc,stdout,stderr = run_sub_or_cmd(my_file, [cmd_line_args                      ], 
+#                                      'dontfind',[bldroot      , libroot   , caseroot])
+#      expect(rc == 0, "pop buildlib failure")
 
        #---- "hide" pop Filepath, etc., as obj dir is shared by other builds ---
        objroot = case.get_value("OBJROOT")
@@ -89,9 +90,11 @@ def _build_ocpl():
        print("<ocpl:_build_ocpl> my_file     = %s" % my_file   )
        print("<ocpl:_build_ocpl> cmd_lin_args= %s" % cmd_line_args)
 
-       rc,stdout,stderr = run_sub_or_cmd(my_file, [cmd_line_args                      ], 
-                                       'dontfind',[bldroot      , libroot   , caseroot])
-       expect(rc == 0, "roms buildlib failure")
+       run_sub_or_cmd(my_file, [cmd_line_args],'dontfind',[bldroot,libroot,caseroot])
+#                                      'dontfind',[bldroot      , libroot   , caseroot])
+#      rc,stdout,stderr = run_sub_or_cmd(my_file, [cmd_line_args                      ], 
+#                                      'dontfind',[bldroot      , libroot   , caseroot])
+#      expect(rc == 0, "roms buildlib failure")
 
        #---- "hide" roms Filepath, etc., as obj dir is shared by other builds ---
        objroot = case.get_value("OBJROOT")
