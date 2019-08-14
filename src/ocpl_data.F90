@@ -51,10 +51,10 @@ module ocpl_data_mod
    character(16)                    :: name_r
 
    type(mct_sMatp)        :: sMatp_r2o
-   character(*),parameter :: r2o_mapfile = "/glade/p/cesm/cseg/mapping/makemaps/gom3_to_gx1v7_181014/map_gom3_to_gx1v7_aavg_181014.nc "
+   character(*),parameter :: r2o_mapfile = "/glade/p/cesm/cseg/mapping/makemaps/gom3_to_gx1v7_181014/map_gom3_to_gx1v7_bilin_181014.nc "
    character(*),parameter :: r2o_maptype = "Y"
    type(mct_sMatp)        :: sMatp_o2r
-   character(*),parameter :: o2r_mapfile = "/glade/p/cesm/cseg/mapping/makemaps/gom3_to_gx1v7_181014/map_gx1v7_to_gom3_aavg_181014.nc "
+   character(*),parameter :: o2r_mapfile = "/glade/p/cesm/cseg/mapping/makemaps/gom3_to_gx1v7_190809/map_gx1v7_to_gom3_bilinex_190809.nc "
    character(*),parameter :: o2r_maptype = "Y"
 
 #ifdef CPP_VECTOR
