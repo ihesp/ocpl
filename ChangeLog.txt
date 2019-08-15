@@ -1,4 +1,17 @@
 ================================================================================
+Tag name: master_190815
+Originator(s): kauff
+Date: 2019 Aug 15
+One-line Summary: builds & runs on cheyenne
+
+builds & runs for (at least) one week, has new pop<->roms mapping files
+r2o_mapfile = .../makemaps/gom3_to_gx1v7_181014/map_gom3_to_gx1v7_bilin_181014.nc
+previous aavg variant had a bug (misses a few pop cells, but that's OK?)
+
+o2r_mapfile = .../gom3_to_gx1v7_190809/map_gx1v7_to_gom3_bilinex_190809.nc
+need additional extrapolation to cover whole roms domain
+
+================================================================================
 Tag name: master_190711
 Originator(s): kauff
 Date: 2019 July 11
