@@ -109,7 +109,8 @@ contains
    integer(IN) :: ni_o, nj_o
    integer(IN) :: ni_r, nj_r
    integer(IN) :: rc
-   integer(IN) :: k       ! aVect index 
+   integer(IN) :: k       ! aVect field index 
+   integer(IN) :: n       ! aVect cell index 
    integer(IN) :: lSize_o ! aVect local size of *_o grid
 
    logical :: restart
@@ -219,10 +220,13 @@ contains
    write(stdout,'(2a,2i6)'   ) subname,'<DEBUG> So_t index = ',k
    write(stdout,'(2a,2e12.4)') subname,'<DEBUG> min/max o2x_o SST0= ',minval(o2x_o%rAttr(k,:)),maxval(o2x_o%rAttr(k,:))
    write(*     ,'(2a,2e12.4)') subname,'<DEBUG> min/max o2x_o SST0= ',minval(o2x_o%rAttr(k,:)),maxval(o2x_o%rAttr(k,:))
-   where (r2x_o%rAttr(k,:) > 100.0)  ! cells not mapped to have sst = 0.0
-   !  o2x_o%rAttr(:,:) = r2x_o%rAttr(:,:)  ! everything
-!     o2x_o%rAttr(k,:) = r2x_o%rAttr(k,:)  ! just SST
-   end where
+   lsize_o = mct_aVect_lsize( o2x_o )
+   do n=1,lsize_o
+      if (r2x_o%rAttr(k,n) > 1.0) then  ! has data mapped from roms (unmapped cells have sst = 0)
+          o2x_o%rAttr(:,n) = r2x_o%rAttr(:,n)  ! merge all fields
+      !   o2x_o%rAttr(k,n) = r2x_o%rAttr(k,n)  ! merge SST only
+      end if
+   end do
    write(stdout,'(2a,2e12.4)') subname,'<DEBUG> min/max r2x_r SST = ',minval(r2x_r%rAttr(k,:)),maxval(r2x_r%rAttr(k,:))
    write(stdout,'(2a,2e12.4)') subname,'<DEBUG> min/max r2x_o SST = ',minval(r2x_o%rAttr(k,:)),maxval(r2x_o%rAttr(k,:))
    write(stdout,'(2a,2e12.4)') subname,'<DEBUG> min/max o2x_o SST = ',minval(o2x_o%rAttr(k,:)),maxval(o2x_o%rAttr(k,:))
@@ -265,7 +269,9 @@ contains
    !----- local variables -----
    integer :: lbnum
    integer(IN) :: ymd,tod
-   integer(IN) :: k  ! aVect index 
+   integer(IN) :: k       ! aVect field index 
+   integer(IN) :: n       ! aVect cell index 
+   integer(IN) :: lSize_o ! aVect local size of *_o grid
 
    character(*), parameter :: SubName = "(ocn_run_mct) "
    character(*), parameter :: F00 =  "( '(ocn_run_mct) ===== ',a,' ',70('=') )"
@@ -329,10 +335,13 @@ contains
    write(stdout,'(2a,2i6)'   ) subname,'<DEBUG> So_t index = ',k
    write(stdout,'(2a,2e12.4)') subname,'<DEBUG> min/max o2x_o SST0= ',minval(o2x_o%rAttr(k,:)),maxval(o2x_o%rAttr(k,:))
    write(*     ,'(2a,2e12.4)') subname,'<DEBUG> min/max o2x_o SST0= ',minval(o2x_o%rAttr(k,:)),maxval(o2x_o%rAttr(k,:))
-   where (r2x_o%rAttr(k,:) > 100.0)  ! cells not mapped to have sst = 0.0
-   !  o2x_o%rAttr(:,:) = r2x_o%rAttr(:,:)  ! everything
-      o2x_o%rAttr(k,:) = r2x_o%rAttr(k,:)  ! just SST
-   end where
+   lsize_o = mct_aVect_lsize( o2x_o )
+   do n=1,lsize_o
+      if (r2x_o%rAttr(k,n) > 1.0) then  ! has data mapped from roms (unmapped cells have sst = 0)
+          o2x_o%rAttr(:,n) = r2x_o%rAttr(:,n)  ! merge all fields
+      !   o2x_o%rAttr(k,n) = r2x_o%rAttr(k,n)  ! merge SST only
+      end if
+   end do
    write(stdout,'(2a,2e12.4)') subname,'<DEBUG> min/max r2x_r SST = ',minval(r2x_r%rAttr(k,:)),maxval(r2x_r%rAttr(k,:))
    write(stdout,'(2a,2e12.4)') subname,'<DEBUG> min/max r2x_o SST = ',minval(r2x_o%rAttr(k,:)),maxval(r2x_o%rAttr(k,:))
    write(stdout,'(2a,2e12.4)') subname,'<DEBUG> min/max o2x_o SST = ',minval(o2x_o%rAttr(k,:)),maxval(o2x_o%rAttr(k,:))
