@@ -58,6 +58,13 @@ module ocpl_fields_mod
       //':So_ubar'     &    ! vertically integrated velocity  DEF
       //':So_vbar'          ! vertically integrated velocity  DEF
 
+   ! Fluxes
+   character(*), parameter :: ocpl_fields_p2x_2d_fluxes = &
+         '      '           !                                 DEF
+
+   character(*), parameter :: ocpl_fields_p2x_2d_fields = &
+      trim(ocpl_fields_p2x_2d_states)//":"//trim(ocpl_fields_p2x_2d_fluxes)
+
    ! States
    character(*), parameter :: ocpl_fields_p2x_3d_states = &
          'So_temp'     &    ! ocean potential temperature     DEF

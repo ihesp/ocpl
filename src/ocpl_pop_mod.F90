@@ -96,7 +96,7 @@ module ocpl_pop_mod
 ! !PUBLIC MEMBER FUNCTIONS:
 
    public :: ocpl_pop_init
-!  public :: ocpl_pop_export
+   public :: ocpl_pop_export
 !  public :: ocpl_pop_import
 
 
@@ -109,7 +109,7 @@ module ocpl_pop_mod
 ! !PRIVATE MODULE VARIABLES
 
 
-   real (r8),allocatable :: SBUFF_SUM(:,:,:,:) ! accum/sum/tavg export quantities
+!  real (r8),allocatable :: SBUFF_SUM(:,:,:,:) ! accum/sum/tavg export quantities
    real (r8) ::  tlast_coupled
 
    integer (int_kind)  ::   nsend, nrecv
@@ -123,7 +123,7 @@ contains
 !=========================================================================================
 
 !BOP !====================================================================================
-
+!
 ! !IROUTINE: ocpl_pop_init
 !
 ! !DESCRIPTION:
@@ -158,11 +158,13 @@ subroutine ocpl_pop_init( p2x_p, p2x_2d_p, p2x_3d_p)
 !
 !------------------------------------------------------------------------------------------
 
+   write(stdout,*) subname,"Enter"
+
    nlev_p = km
    lsize = mct_aVect_lsize( p2x_p )
 
    !----- init 2d fields specifically for pop/roms coupling -----
-   call mct_aVect_init(p2x_2d_p, rList=ocpl_fields_p2x_3d_fields,lsize=lsize)
+   call mct_aVect_init(p2x_2d_p, rList=ocpl_fields_p2x_2d_fields,lsize=lsize)
    call mct_aVect_zero(p2x_2d_p)
 
    !----- init 3d fields specifically for pop/roms coupling -----
@@ -174,6 +176,15 @@ subroutine ocpl_pop_init( p2x_p, p2x_2d_p, p2x_3d_p)
       call mct_aVect_zero(p2x_3d_p(k))
    enddo
 
+   !--- set aVect field indicies ---
+   p2x_2d_So_ssh  = mct_aVect_indexRA(p2x_2d_p   ,"So_ssh" )
+   p2x_2d_So_ubar = mct_aVect_indexRA(p2x_2d_p   ,"So_ubar")
+   p2x_2d_So_vbar = mct_aVect_indexRA(p2x_2d_p   ,"So_vbar")
+   p2x_3d_So_temp = mct_aVect_indexRA(p2x_3d_p(1),"So_temp")
+   p2x_3d_So_salt = mct_aVect_indexRA(p2x_3d_p(1),"So_salt")
+   p2x_3d_So_uvel = mct_aVect_indexRA(p2x_3d_p(1),"So_uvel")
+   p2x_3d_So_vvel = mct_aVect_indexRA(p2x_3d_p(1),"So_vvel")
+
    !--- DEBUG ---
    if (dbug > 0) then
       k = p2x_2d_So_ssh
@@ -184,9 +195,129 @@ subroutine ocpl_pop_init( p2x_p, p2x_2d_p, p2x_3d_p)
       call flushm (stdout)
    end if
 
-end subroutine ocpl_pop_init
-!=========================================================================================
+   write(stdout,*) subname,"Exit"
 
- 
+end subroutine ocpl_pop_init
+
+!=========================================================================================
+!BOP !====================================================================================
+!
+! !IROUTINE: ocpl_pop_export
+!
+! !DESCRIPTION:
+!    get output data from pop, ocpl/pop 3d interface  
+!
+! !INTERFACE:
+!
+! !REVISION HISTORY:
+!    2019 Sep -- Brian Kauffman, initial version
+!
+! !INTERFACE: ----------------------------------------------------------------------------
+
+subroutine ocpl_pop_export( p2x_2d_p, p2x_3d_p)
+
+! !INPUT/OUTPUT PARAMETERS:
+
+   type(mct_aVect)             , intent(inout) :: p2x_2d_p
+   type(mct_aVect),pointer     , intent(inout) :: p2x_3d_p(:)
+
+!EOP
+!BOC
+
+!-----------------------------------------------------------------------------------------
+!  local variables
+!-----------------------------------------------------------------------------------------
+
+!  use domain_size, only: km  ! # vertical levels, for 3d coupling
+
+#ifdef _OPENMP
+   integer, external :: omp_get_max_threads  ! max number of threads that can execute
+#endif
+
+   integer (int_kind) ::  &
+      k,i,j,n,kuse
+
+   real (r8), dimension(nx_block,ny_block,max_blocks_clinic) ::  &
+      WORK                ! local work arrays
+
+   integer (int_kind) :: &
+      iblock              ! block index
+
+   type (block) ::       &
+      this_block          ! block information for current block
+
+   real (r8), dimension(nx_block,ny_block) ::   &
+      WORK1_nrcm,       & ! local 2d work space for NRCM
+      WORK2_nrcm          ! local 2d work space for NRCM
+
+   real (r8), dimension(nx_block,ny_block,km) ::   &
+      WORK3_nrcm,       & ! local 3d work space for NRCM
+      WORK4_nrcm          ! local 3d work space for NRCM
+
+   character(*), parameter :: subName = "(ocpl_pop_export) "
+
+!------------------------------------------------------------------------------
+!  extract data from POP and put into corresponding attribute vectors
+!------------------------------------------------------------------------------
+
+   write(stdout,*) subname,"Enter" ; call flushm (stdout)
+
+      ! accumulate variables
+      n = 0
+      do iblock = 1,nblocks_clinic
+         this_block = get_block(blocks_clinic(iblock),iblock)
+
+         ! move UPTROP and VBTROP to tgrid
+         call ugrid_to_tgrid(WORK1_nrcm(:,:),UBTROP(:,:,curtime,iblock),iblock)
+         call ugrid_to_tgrid(WORK2_nrcm(:,:),VBTROP(:,:,curtime,iblock),iblock)
+
+         ! move UVEL and VVEL to tgrid
+         do k = 1,km
+            call ugrid_to_tgrid(WORK3_nrcm(:,:,k),UVEL(:,:,k,curtime,iblock),iblock)
+            call ugrid_to_tgrid(WORK4_nrcm(:,:,k),VVEL(:,:,k,curtime,iblock),iblock)
+         enddo
+
+         do j = this_block%jb,this_block%je
+         do i = this_block%ib,this_block%ie
+            n = n + 1
+
+            p2x_2d_p%rAttr(p2x_2d_So_ssh ,n) = p2x_2d_p%rAttr(p2x_2d_So_ssh,n) &
+                                             +      PSURF(i,j,curtime,iblock)/grav
+            p2x_2d_p%rAttr(p2x_2d_So_ubar,n) = p2x_2d_p%rAttr(p2x_2d_So_ubar,n) &
+                                             +      WORK1_nrcm(i,j)
+            p2x_2d_p%rAttr(p2x_2d_So_vbar,n) = p2x_2d_p%rAttr(p2x_2d_So_vbar,n) &
+                                             +      WORK2_nrcm(i,j)
+            do k = 1,km
+               if (KMT(i,j,iblock).gt.0) then
+                  kuse = min(k, KMT(i,j,iblock))
+                  p2x_3d_p(k)%rAttr(p2x_3d_So_temp,n) = p2x_3d_p(k)%rAttr(p2x_3d_So_temp,n) &
+                                                      +      TRACER(i,j,kuse,1,curtime,iblock)
+                  p2x_3d_p(k)%rAttr(p2x_3d_So_salt,n) = p2x_3d_p(k)%rAttr(p2x_3d_So_salt,n) &
+                                                      +      TRACER(i,j,kuse,2,curtime,iblock)
+                  p2x_3d_p(k)%rAttr(p2x_3d_So_uvel,n) = p2x_3d_p(k)%rAttr(p2x_3d_So_uvel,n) &
+                                                      +      WORK3_nrcm(i,j,kuse)
+                  p2x_3d_p(k)%rAttr(p2x_3d_So_vvel,n) = p2x_3d_p(k)%rAttr(p2x_3d_So_vvel,n) &
+                                                      +      WORK4_nrcm(i,j,kuse)
+               endif
+            enddo
+         enddo
+         enddo
+      enddo
+
+   !--- DEBUG ---
+   if (dbug > 0) then
+      k = p2x_2d_So_ssh
+      write(stdout,*) subname,"p2x_2d_p    ssh  min,max: ",minval(p2x_2d_p   %rAttr(k,:)),maxval(p2x_2d_p   %rAttr(k,:))
+      k = p2x_3d_So_temp
+      write(stdout,*) subname,"p2x_3d_p(1) temp min,max= ",minval(p2x_3d_p(1)%rAttr(k,:)),maxval(p2x_3d_p(1)%rAttr(k,:))
+      write(stdout,*) subname,"p2x_3d_p(2) temp min,max= ",minval(p2x_3d_p(2)%rAttr(k,:)),maxval(p2x_3d_p(1)%rAttr(k,:))
+      call flushm (stdout)
+   end if
+
+   write(stdout,*) subname,"Exit" ; call flushm (stdout)
+
+end subroutine ocpl_pop_export
+
+!=========================================================================================
 !=========================================================================================
 end module ocpl_pop_mod

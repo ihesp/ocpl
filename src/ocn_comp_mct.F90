@@ -21,8 +21,6 @@ module ocn_comp_mct
 !    2018-Sep: first version by Brian Kauffman 
 !
 ! !USES:
-   use ocpl_data_mod
-
    use pop_comp_mct , only :  pop_init_mct, pop_run_mct, pop_final_mct
    use roms_comp_mct, only : roms_init_mct,roms_run_mct,roms_final_mct
    use io_types     , only :  pop_stdout => stdout  ! ocpl redirects stdout for pop
@@ -42,6 +40,9 @@ module ocn_comp_mct
    use shr_cal_mod,       only : shr_cal_date2ymd
    use shr_sys_mod
    use shr_kind_mod, only: IN=>SHR_KIND_IN, R8=>SHR_KIND_R8, CS=>SHR_KIND_CS, CL=>SHR_KIND_CL
+
+   use ocpl_data_mod
+   use ocpl_pop_mod
 
 ! !PUBLIC MEMBER FUNCTIONS:
 
@@ -234,6 +235,11 @@ contains
    write(*     ,'(2a,2e12.4)') subname,'<DEBUG> min/max r2x_o SST = ',minval(r2x_o%rAttr(k,:)),maxval(r2x_o%rAttr(k,:))
    write(*     ,'(2a,2e12.4)') subname,'<DEBUG> min/max o2x_o SST = ',minval(o2x_o%rAttr(k,:)),maxval(o2x_o%rAttr(k,:))
 
+   !----------------------------------------------------------------------------
+   write(stdout,*) subName, "init data for 3D coupling with pop" ; call shr_sys_flush(stdout)
+   !----------------------------------------------------------------------------
+   call ocpl_pop_init( o2x_o, p2x_2d_p, p2x_3d_p)
+
    write(stdout,F00) "EXIT" ; call shr_sys_flush(stdout)
 
    !--- Reset shr logging to original values ---
@@ -309,6 +315,11 @@ contains
    !----------------------------------------------------------------------------
    write(stdout,F01) "call pop_run_mct"
    call pop_run_mct( EClock, cdata_o, x2o_o, o2x_o)
+
+   !----------------------------------------------------------------------------
+   write(stdout,F01) "extract ocean coupling fields from pop (roms lateral BCs" ; call shr_sys_flush(stdout)
+   !----------------------------------------------------------------------------
+   call ocpl_pop_export( p2x_2d_p, p2x_3d_p)
 
    !----------------------------------------------------------------------------
    ! run roms
