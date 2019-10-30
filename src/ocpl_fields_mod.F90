@@ -80,14 +80,14 @@ module ocpl_fields_mod
       trim(ocpl_fields_p2x_3d_states)//":"//trim(ocpl_fields_p2x_3d_fluxes)
 
 
-   integer(IN) :: p2x_2d_So_ssh
-   integer(IN) :: p2x_2d_So_ubar
-   integer(IN) :: p2x_2d_So_vbar
+   integer(IN) :: k_p2x_2d_So_ssh
+   integer(IN) :: k_p2x_2d_So_ubar
+   integer(IN) :: k_p2x_2d_So_vbar
 
-   integer(IN) :: p2x_3d_So_temp
-   integer(IN) :: p2x_3d_So_salt
-   integer(IN) :: p2x_3d_So_uvel
-   integer(IN) :: p2x_3d_So_vvel
+   integer(IN) :: k_p2x_3d_So_temp
+   integer(IN) :: k_p2x_3d_So_salt
+   integer(IN) :: k_p2x_3d_So_uvel
+   integer(IN) :: k_p2x_3d_So_vvel
 
    save ! save everything
 
