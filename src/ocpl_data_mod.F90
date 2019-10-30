@@ -4,7 +4,7 @@ module ocpl_data_mod
 ! MODULE: ocpl_data
 !
 ! DESCRIPTION:
-!    This module holds data for the ocpl ocean driver 
+!    This module holds global data structures for the ocpl ocean driver 
 !
 ! !REVISION HISTORY:
 !    2018-Oct: first version by Brian Kauffman 
@@ -26,49 +26,69 @@ module ocpl_data_mod
 
 !  PUBLIC DATA:
 
-!  integer(IN)     :: logunit = 6 ! use stdout in ocn_comp_mct.F90  ?
-
-   integer(IN)             :: nlev_p      ! pop number of vertical levels
-   type(mct_aVect)         :: p2x_2d_p    ! pop output: 2D fields for pop/roms coupling
-   type(mct_aVect),pointer :: p2x_3d_p(:) ! pop output: 3D fields for pop/roms coupling
-
-   type(mct_aVect) :: x2o_r   ! roms  input: x2o_o mapped to r grid 
-   type(mct_aVect) :: r2x_r   ! roms ouptut 
-   type(mct_aVect) :: r2x_o   ! roms ouptut: r2x_r mapped to o grid
-
    character(CL)   :: start_type
    character(CS)   :: case_name
+   integer(IN)     :: o_logUnit = 6
 
-   !--- "o" data (global domain coupler knows about, which is pop domain) ----
+   !--------------------------------------------------------------------------------------
+   ! "_o" data -- ocean domain coupler interacts with, TENTITIVELY is the pop domain
+   ! "_p" data -- pop   domain, coupler doesn't know about this
+   ! "_r" data -- roms  domain, coupler doesn't know about this
+   !--------------------------------------------------------------------------------------
+
+   !--- pop  output: orig & re-gridded ---
+!  type(mct_aVect)         :: x2o_p          ! pop  input: x2o_o mapped to p grid 
+!  type(mct_aVect)         :: p2x_p          ! pop ouptut 
+   type(mct_aVect)         :: p2x_2d_p       ! pop output: 2D fields for pop/roms coupling
+   type(mct_aVect),pointer :: p2x_3d_p(:)    ! pop output: 3D fields for pop/roms coupling (level)
+   type(mct_aVect),pointer :: p2x_2d_rc(:)   ! pop output: 2D fields on roms grid (curtain)
+   type(mct_aVect),pointer :: p2x_3d_rc(:,:) ! pop output: 3D fields on roms grid (curtain,level)
+
+   integer(IN),parameter   :: k_Scurtain = 4 ! roms BC curtain index, South
+   integer(IN),parameter   :: k_Ecurtain = 3 ! roms BC curtain index, East
+   integer(IN),parameter   :: k_Ncurtain = 2 ! roms BC curtain index, North
+   integer(IN),parameter   :: k_Wcurtain = 1 ! roms BC curtain index, West
+
+   !--- roms output: orig & re-gridded ---
+   type(mct_aVect)         :: x2o_r          ! roms  input: x2o_o mapped to r grid 
+   type(mct_aVect)         :: r2x_r          ! roms ouptut 
+   type(mct_aVect)         :: r2x_o          ! roms ouptut: r2x_r mapped to o grid
+   type(mct_aVect),pointer :: r2x_3d_r (:,:) ! roms horiz grid, roms vert grid, (nest,level)
+   type(mct_aVect),pointer :: r2x_3d_rp(:,:) ! roms horiz grid, pop vert grid, (nest,level)
+   type(mct_aVect),pointer :: r2x_3d_p (:,:) ! pop  horiz grid, pop vert grid, (nest,level)
+
+   !--- roms & pop: number of vertical levels ---
+   integer(IN)             :: nlev_p         ! pop : number of vertical levels
+   integer(IN)             :: nlev_pr        ! pop : number of vertical levels to be restored
+   integer(IN)             :: nlev_r         ! roms: number of levels 
+
 !  type(seq_cdata)        , pointer :: cdata_o   ! coupler instantiates this
+   type(seq_cdata)                  :: cdata_r   ! regional
+
    type(mct_gGrid)        , pointer :: dom_o 
+   type(mct_gGrid), target          :: dom_r
+
    type(mct_gsMap)        , pointer :: gsMap_o 
+   type(mct_gsMap)        , target  :: gsMap_r  
+
    type(seq_infodata_type), pointer :: infodata_o
-   integer(IN)                      :: mpicom_o, OCNID_o
+   integer(IN)                      :: mpicom_o, OCNID_o ! all ocn comps share same mpi comm, ID
    character(16)                    :: name_o
 
-   !--- "r" data (regional domain coupler doesn't know about, which is roms domain) ----
-   type(seq_cdata)                  :: cdata_r   ! regional
-   type(mct_gGrid)        , target  :: dom_r    
-   type(mct_gsMap)        , target  :: gsMap_r  
 !  type(seq_infodata_type), target  :: infodata_r   roms shares infodata_o with pop
    integer(IN)                      :: mpicom_r, OCNID_r
    character(16)                    :: name_r
 
-   type(mct_sMatp)        :: sMatp_r2o
-   character(*),parameter :: r2o_mapfile = "/glade/p/cesm/cseg/mapping/makemaps/gom3_to_gx1v7_181014/map_gom3_to_gx1v7_bilin_181014.nc "
-   character(*),parameter :: r2o_maptype = "Y"
-   type(mct_sMatp)        :: sMatp_o2r
-   character(*),parameter :: o2r_mapfile = "/glade/p/cesm/cseg/mapping/makemaps/gom3_to_gx1v7_190809/map_gx1v7_to_gom3_bilinex_190809.nc "
-   character(*),parameter :: o2r_maptype = "Y"
+   logical    ,parameter ::   Scurtain = .true.  ! true => roms needs BCs for south curtain
+   logical    ,parameter ::   Ecurtain = .true.  ! true => roms needs BCs for  east curtain
+   logical    ,parameter ::   Ncurtain = .true.  ! true => roms needs BCs for north curtain
+   logical    ,parameter ::   Wcurtain = .false. ! true => roms needs BCs for  west curtain
 
 #ifdef CPP_VECTOR
    logical :: usevector = .true.
 #else
    logical :: usevector = .false.
 #endif
-
-
 
    save ! save everything.
 
