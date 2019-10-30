@@ -27,12 +27,12 @@ module ocpl_pop_mod
    use POP_FieldMod
    use POP_GridHorzMod
    use POP_HaloMod
-   use POP_IOUnitsMod
+!  use POP_IOUnitsMod
    use POP_MCT_vars_mod
 
    use ocpl_fields_mod
 
-#ifdef NRCMRESTORING
+#ifdef OCPLRESTORING
    use forcing_pt_interior, only: PT_INTERIOR_DATA     ! alter interal pop data for 2-way coupling
    use forcing_pt_interior, only: PT_RESTORE_RTAU      ! alter interal pop data for 2-way coupling
    use forcing_pt_interior, only: PT_RESTORE_MAX_LEVEL ! alter interal pop data for 2-way coupling
@@ -158,7 +158,7 @@ subroutine ocpl_pop_init( p2x_p, p2x_2d_p, p2x_3d_p)
 !
 !------------------------------------------------------------------------------------------
 
-   write(stdout,*) subname,"Enter"
+   write(o_logunit,*) subname,"Enter"
 
    nlev_p = km
    lsize = mct_aVect_lsize( p2x_p )
@@ -168,7 +168,7 @@ subroutine ocpl_pop_init( p2x_p, p2x_2d_p, p2x_3d_p)
    call mct_aVect_zero(p2x_2d_p)
 
    !----- init 3d fields specifically for pop/roms coupling -----
-   write(stdout,*) subName,"     nlev_p    = ",nlev_p
+   write(o_logunit,*) subName,"     nlev_p    = ",nlev_p
    allocate(p2x_3d_p(nlev_p))
 
    do k = 1, nlev_p
@@ -177,25 +177,25 @@ subroutine ocpl_pop_init( p2x_p, p2x_2d_p, p2x_3d_p)
    enddo
 
    !--- set aVect field indicies ---
-   p2x_2d_So_ssh  = mct_aVect_indexRA(p2x_2d_p   ,"So_ssh" )
-   p2x_2d_So_ubar = mct_aVect_indexRA(p2x_2d_p   ,"So_ubar")
-   p2x_2d_So_vbar = mct_aVect_indexRA(p2x_2d_p   ,"So_vbar")
-   p2x_3d_So_temp = mct_aVect_indexRA(p2x_3d_p(1),"So_temp")
-   p2x_3d_So_salt = mct_aVect_indexRA(p2x_3d_p(1),"So_salt")
-   p2x_3d_So_uvel = mct_aVect_indexRA(p2x_3d_p(1),"So_uvel")
-   p2x_3d_So_vvel = mct_aVect_indexRA(p2x_3d_p(1),"So_vvel")
+   k_p2x_2d_So_ssh  = mct_aVect_indexRA(p2x_2d_p   ,"So_ssh" )
+   k_p2x_2d_So_ubar = mct_aVect_indexRA(p2x_2d_p   ,"So_ubar")
+   k_p2x_2d_So_vbar = mct_aVect_indexRA(p2x_2d_p   ,"So_vbar")
+   k_p2x_3d_So_temp = mct_aVect_indexRA(p2x_3d_p(1),"So_temp")
+   k_p2x_3d_So_salt = mct_aVect_indexRA(p2x_3d_p(1),"So_salt")
+   k_p2x_3d_So_uvel = mct_aVect_indexRA(p2x_3d_p(1),"So_uvel")
+   k_p2x_3d_So_vvel = mct_aVect_indexRA(p2x_3d_p(1),"So_vvel")
 
    !--- DEBUG ---
    if (dbug > 0) then
-      k = p2x_2d_So_ssh
-      write(stdout,*) subname,"p2x_2d_p    ssh  min,max: ",minval(p2x_2d_p   %rAttr(k,:)),maxval(p2x_2d_p   %rAttr(k,:))
-      k = p2x_3d_So_temp
-      write(stdout,*) subname,"p2x_3d_p(1) temp min,max= ",minval(p2x_3d_p(1)%rAttr(k,:)),maxval(p2x_3d_p(1)%rAttr(k,:))
-      write(stdout,*) subname,"p2x_3d_p(2) temp min,max= ",minval(p2x_3d_p(2)%rAttr(k,:)),maxval(p2x_3d_p(1)%rAttr(k,:))
-      call flushm (stdout)
+      k = k_p2x_2d_So_ssh
+      write(o_logunit,*) subname,"p2x_2d_p    ssh  min,max: ",minval(p2x_2d_p   %rAttr(k,:)),maxval(p2x_2d_p   %rAttr(k,:))
+      k = k_p2x_3d_So_temp
+      write(o_logunit,*) subname,"p2x_3d_p(1) temp min,max= ",minval(p2x_3d_p(1)%rAttr(k,:)),maxval(p2x_3d_p(1)%rAttr(k,:))
+      write(o_logunit,*) subname,"p2x_3d_p(2) temp min,max= ",minval(p2x_3d_p(2)%rAttr(k,:)),maxval(p2x_3d_p(1)%rAttr(k,:))
+      call flushm (o_logunit)
    end if
 
-   write(stdout,*) subname,"Exit"
+   write(o_logunit,*) subname,"Exit"
 
 end subroutine ocpl_pop_init
 
@@ -234,87 +234,70 @@ subroutine ocpl_pop_export( p2x_2d_p, p2x_3d_p)
    integer, external :: omp_get_max_threads  ! max number of threads that can execute
 #endif
 
-   integer (int_kind) ::  &
-      k,i,j,n,kuse
+   integer(IN) :: k,i,j,n,kuse
+   integer(IN) :: iblock              ! block index
+   type(block) :: this_block          ! block information for current block
 
-   real (r8), dimension(nx_block,ny_block,max_blocks_clinic) ::  &
-      WORK                ! local work arrays
-
-   integer (int_kind) :: &
-      iblock              ! block index
-
-   type (block) ::       &
-      this_block          ! block information for current block
-
-   real (r8), dimension(nx_block,ny_block) ::   &
-      WORK1_nrcm,       & ! local 2d work space for NRCM
-      WORK2_nrcm          ! local 2d work space for NRCM
-
-   real (r8), dimension(nx_block,ny_block,km) ::   &
-      WORK3_nrcm,       & ! local 3d work space for NRCM
-      WORK4_nrcm          ! local 3d work space for NRCM
+   real(r8) :: WORK      (nx_block,ny_block,max_blocks_clinic) ! local work arrays
+   real(R8) :: WORK1_ocpl(nx_block,ny_block)                   ! local 2d work space
+   real(R8) :: WORK2_ocpl(nx_block,ny_block)                   ! local 2d work space
+   real(R8) :: WORK3_ocpl(nx_block,ny_block,km)                ! local 3d work space
+   real(R8) :: WORK4_ocpl(nx_block,ny_block,km)                ! local 3d work space
 
    character(*), parameter :: subName = "(ocpl_pop_export) "
 
 !------------------------------------------------------------------------------
 !  extract data from POP and put into corresponding attribute vectors
+!  Q: do pop velocities need to be rotated?
 !------------------------------------------------------------------------------
 
-   write(stdout,*) subname,"Enter" ; call flushm (stdout)
+   write(o_logunit,*) subname,"Enter" ; call flushm (o_logunit)
 
-      ! accumulate variables
-      n = 0
-      do iblock = 1,nblocks_clinic
-         this_block = get_block(blocks_clinic(iblock),iblock)
+   p2x_2d_p%rAttr(:,:) = 1.0e30
+   n = 0
+   do iblock = 1,nblocks_clinic
+      this_block = get_block(blocks_clinic(iblock),iblock)
 
-         ! move UPTROP and VBTROP to tgrid
-         call ugrid_to_tgrid(WORK1_nrcm(:,:),UBTROP(:,:,curtime,iblock),iblock)
-         call ugrid_to_tgrid(WORK2_nrcm(:,:),VBTROP(:,:,curtime,iblock),iblock)
+      ! move UPTROP and VBTROP to tgrid
+      call ugrid_to_tgrid(WORK1_ocpl(:,:),UBTROP(:,:,curtime,iblock),iblock)
+      call ugrid_to_tgrid(WORK2_ocpl(:,:),VBTROP(:,:,curtime,iblock),iblock)
 
-         ! move UVEL and VVEL to tgrid
+      ! move UVEL and VVEL to tgrid
+      do k = 1,km
+         call ugrid_to_tgrid(WORK3_ocpl(:,:,k),UVEL(:,:,k,curtime,iblock),iblock)
+         call ugrid_to_tgrid(WORK4_ocpl(:,:,k),VVEL(:,:,k,curtime,iblock),iblock)
+      enddo
+
+      do j = this_block%jb,this_block%je
+      do i = this_block%ib,this_block%ie
+         n = n + 1
+         p2x_2d_p%rAttr(k_p2x_2d_So_ssh ,n) =      PSURF(i,j,curtime,iblock)/grav
+         p2x_2d_p%rAttr(k_p2x_2d_So_ubar,n) = WORK1_ocpl(i,j)
+         p2x_2d_p%rAttr(k_p2x_2d_So_vbar,n) = WORK2_ocpl(i,j)
          do k = 1,km
-            call ugrid_to_tgrid(WORK3_nrcm(:,:,k),UVEL(:,:,k,curtime,iblock),iblock)
-            call ugrid_to_tgrid(WORK4_nrcm(:,:,k),VVEL(:,:,k,curtime,iblock),iblock)
-         enddo
-
-         do j = this_block%jb,this_block%je
-         do i = this_block%ib,this_block%ie
-            n = n + 1
-
-            p2x_2d_p%rAttr(p2x_2d_So_ssh ,n) = p2x_2d_p%rAttr(p2x_2d_So_ssh,n) &
-                                             +      PSURF(i,j,curtime,iblock)/grav
-            p2x_2d_p%rAttr(p2x_2d_So_ubar,n) = p2x_2d_p%rAttr(p2x_2d_So_ubar,n) &
-                                             +      WORK1_nrcm(i,j)
-            p2x_2d_p%rAttr(p2x_2d_So_vbar,n) = p2x_2d_p%rAttr(p2x_2d_So_vbar,n) &
-                                             +      WORK2_nrcm(i,j)
-            do k = 1,km
-               if (KMT(i,j,iblock).gt.0) then
-                  kuse = min(k, KMT(i,j,iblock))
-                  p2x_3d_p(k)%rAttr(p2x_3d_So_temp,n) = p2x_3d_p(k)%rAttr(p2x_3d_So_temp,n) &
-                                                      +      TRACER(i,j,kuse,1,curtime,iblock)
-                  p2x_3d_p(k)%rAttr(p2x_3d_So_salt,n) = p2x_3d_p(k)%rAttr(p2x_3d_So_salt,n) &
-                                                      +      TRACER(i,j,kuse,2,curtime,iblock)
-                  p2x_3d_p(k)%rAttr(p2x_3d_So_uvel,n) = p2x_3d_p(k)%rAttr(p2x_3d_So_uvel,n) &
-                                                      +      WORK3_nrcm(i,j,kuse)
-                  p2x_3d_p(k)%rAttr(p2x_3d_So_vvel,n) = p2x_3d_p(k)%rAttr(p2x_3d_So_vvel,n) &
-                                                      +      WORK4_nrcm(i,j,kuse)
-               endif
-            enddo
-         enddo
+            if (KMT(i,j,iblock).gt.0) then
+               kuse = min(k, KMT(i,j,iblock))
+               p2x_3d_p(k)%rAttr(k_p2x_3d_So_temp,n) = TRACER(i,j,kuse,1,curtime,iblock)
+               p2x_3d_p(k)%rAttr(k_p2x_3d_So_salt,n) = TRACER(i,j,kuse,2,curtime,iblock)
+               p2x_3d_p(k)%rAttr(k_p2x_3d_So_uvel,n) = WORK3_ocpl(i,j,kuse)
+               p2x_3d_p(k)%rAttr(k_p2x_3d_So_vvel,n) = WORK4_ocpl(i,j,kuse)
+            endif
          enddo
       enddo
+      enddo
+   enddo
 
    !--- DEBUG ---
    if (dbug > 0) then
-      k = p2x_2d_So_ssh
-      write(stdout,*) subname,"p2x_2d_p    ssh  min,max: ",minval(p2x_2d_p   %rAttr(k,:)),maxval(p2x_2d_p   %rAttr(k,:))
-      k = p2x_3d_So_temp
-      write(stdout,*) subname,"p2x_3d_p(1) temp min,max= ",minval(p2x_3d_p(1)%rAttr(k,:)),maxval(p2x_3d_p(1)%rAttr(k,:))
-      write(stdout,*) subname,"p2x_3d_p(2) temp min,max= ",minval(p2x_3d_p(2)%rAttr(k,:)),maxval(p2x_3d_p(1)%rAttr(k,:))
-      call flushm (stdout)
+      k = k_p2x_2d_So_ssh
+      write(o_logunit,*) subname,"p2x_2d_p    ssh  min,max: ",minval(p2x_2d_p   %rAttr(k,:)),maxval(p2x_2d_p   %rAttr(k,:))
+      k = k_p2x_3d_So_temp
+      write(o_logunit,*) subname,"p2x_3d_p(1) temp min,max= ",minval(p2x_3d_p(1)%rAttr(k,:)),maxval(p2x_3d_p(1)%rAttr(k,:))
+      write(o_logunit,*) subname,"p2x_3d_p(2) temp min,max= ",minval(p2x_3d_p(2)%rAttr(k,:)),maxval(p2x_3d_p(1)%rAttr(k,:))
+      call flushm (o_logunit)
    end if
 
-   write(stdout,*) subname,"Exit" ; call flushm (stdout)
+   write(o_logunit,*) subname,"Exit" ; call flushm (o_logunit)
 
 end subroutine ocpl_pop_export
 
