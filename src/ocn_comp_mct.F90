@@ -69,11 +69,10 @@ module ocn_comp_mct
 
    integer (IN)  :: nsend, nrecv
 
-!===============================================================================
+!=========================================================================================
 contains
-!===============================================================================
-
-!BOP ===========================================================================
+!=========================================================================================
+!BOP =====================================================================================
 !
 ! !IROUTINE: ocn_init_mct
 !
@@ -84,7 +83,8 @@ contains
 ! !REVISION HISTORY:
 !    2018 Oct -- Brian Kauffman, original code
 !
-! !INTERFACE: ------------------------------------------------------------------
+! !INTERFACE:
+!-----------------------------------------------------------------------------------------
 
   subroutine ocn_init_mct( EClock, cdata_o, x2o_o, o2x_o, NLFilename )
 
@@ -120,9 +120,9 @@ contains
    character(*), parameter :: F00 =  "( '(ocn_init_mct) ===== ',a,' ',70('=') )"
    character(*), parameter :: F01 =  "( '(ocn_init_mct) ----- ',a,' ',70('-') )"
 
-!-----------------------------------------------------------------------
+!-----------------------------------------------------------------------------------------
 !
-!-----------------------------------------------------------------------
+!-----------------------------------------------------------------------------------------
 
    call shr_file_getLogUnit (shrlogunit) ! save log unit
    call shr_file_getLogLevel(shrloglev)  ! save log level
@@ -150,9 +150,9 @@ contains
    write(o_logunit,*) subName, 'case_name  : ' // trim(case_name )
    write(o_logunit,*) subName, 'start_type : ' // trim(start_type)
 
-   !----------------------------------------------------------------------------
-   ! pop setup
-   !----------------------------------------------------------------------------
+   !--------------------------------------------------------------------------------------
+   ! call pop initialize phase
+   !--------------------------------------------------------------------------------------
 
    !--- initialize pop --
    write(o_logunit,F01) "pop_init_mct call" ; call shr_sys_flush(o_logunit)
@@ -163,9 +163,9 @@ contains
 
    call seq_infodata_GetData(infodata_o, ocn_nx = ni_o, ocn_ny = nj_o)
 
-   !----------------------------------------------------------------------------
-   ! roms setup
-   !----------------------------------------------------------------------------
+   !--------------------------------------------------------------------------------------
+   ! call roms initialize phase
+   !--------------------------------------------------------------------------------------
 
    !--- set data, and assign pointers, inside cdata_r --- pop & roms share ID,mpicom,infdodata
    call seq_cdata_init(cdata_r, ID=OCNID_o, dom=dom_r, gsMap=gsMap_r, infodata=infodata_o, name='ROMS')
@@ -181,12 +181,25 @@ contains
    call seq_infodata_GetData(infodata_o, ocn_nx = ni_r, ocn_ny = nj_r)
    call seq_infodata_PutData(infodata_o, ocn_nx = ni_o, ocn_ny = nj_o)
 
-   !--- init data-types needed for ocpl's 3D global/regional ocean coupling ---
+   !--- init aVect for roms output on ocean grid ----
+   lsize_o = mct_aVect_lsize(o2x_o)
+   call mct_aVect_init(r2x_o, r2x_r, lsize=lsize_o)
+   call mct_aVect_zero(r2x_o)
+   write(o_logunit,'(2a,2i6)') subname,'<DEBUG> r2x_o lsize, nflds = ',mct_aVect_lsize(r2x_o),mct_aVect_nRAttr(r2x_o)
+
+   !--------------------------------------------------------------------------------------
+   ! init additional data-types needed for ocpl's 3D global/regional ocean coupling 
+   !--------------------------------------------------------------------------------------
+   
+   write(o_logunit,F01) "call ocpl_pop_init"  ; call shr_sys_flush(o_logunit)
+   call ocpl_pop_init( o2x_o, p2x_2d_p, p2x_3d_p)
+
+   write(o_logunit,F01) "call ocpl_roms_init" ; call shr_sys_flush(o_logunit)
    call ocpl_roms_init()
 
-   !----------------------------------------------------------------------------
+   !--------------------------------------------------------------------------------------
    ! sanity check on some data
-   !----------------------------------------------------------------------------
+   !--------------------------------------------------------------------------------------
    call seq_cdata_setptrs(cdata_o, ID=OCNID_o,                    mpicom=mpicom_o,name=name_o)
    write(o_logunit,*) subName, 'cdata_o ID     : ' ,  OCNID_o
    write(o_logunit,*) subName, 'cdata_o mpicom : ' ,  mpicom_o
@@ -198,25 +211,23 @@ contains
    write(o_logunit,*) subName, 'cdata_r name   : ' // trim(name_r )
    write(o_logunit,*) subName, 'ni_r,nj_r      : ' ,  ni_r,nj_r
 
-   !----------------------------------------------------------------------------
-   ! initialize maps
-   !----------------------------------------------------------------------------
+   !--------------------------------------------------------------------------------------
+   ! initi surface & 3d maps (bk: move to ocpl_map_mod.F90 ?)
+   !--------------------------------------------------------------------------------------
    write(o_logunit,*) subName, "initialize r2o map..."
    call shr_mct_sMatPInitnc(sMatp_r2o,gsMap_r,gsMap_o, trim(r2o_mapfile),trim(r2o_maptype),mpicom_o)
 
    write(o_logunit,*) subName, "initialize o2r map..."
    call shr_mct_sMatPInitnc(sMatp_o2r,gsMap_o,gsMap_r, trim(o2r_mapfile),trim(o2r_maptype),mpicom_o)
 
-   lsize_o = mct_aVect_lsize(o2x_o)
-   call mct_aVect_init(r2x_o, r2x_r, lsize=lsize_o)
-   call mct_aVect_zero(r2x_o)
-   write(o_logunit,'(2a,2i6)'   ) subname,'<DEBUG> r2x_o lsize, nflds = ', mct_aVect_lsize (r2x_o),mct_aVect_nRAttr(r2x_o)
+   write(o_logunit,*) subName, "initialize 3d maps..."
+   call ocpl_map_init()
 
    write(o_logunit,*) subName, "done initializing maps"
 
-   !----------------------------------------------------------------------------
-   ! merge roms & pop output
-   !----------------------------------------------------------------------------
+   !--------------------------------------------------------------------------------------
+   ! merge roms & pop IC output
+   !--------------------------------------------------------------------------------------
    write(o_logunit,*) subname,"map: r2x_r -> r2x_o"
    call mct_sMat_avMult(r2x_r, sMatp_r2o, r2x_o,vector=usevector)
    write(o_logunit,*) subname,' merge roms & pop output'
@@ -238,10 +249,6 @@ contains
    write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max r2x_o SST = ',minval(r2x_o%rAttr(k,:)),maxval(r2x_o%rAttr(k,:))
    write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max o2x_o SST = ',minval(o2x_o%rAttr(k,:)),maxval(o2x_o%rAttr(k,:))
 
-   !----------------------------------------------------------------------------
-   write(o_logunit,*) subName, "init data for 3D coupling with pop" ; call shr_sys_flush(o_logunit)
-   !----------------------------------------------------------------------------
-   call ocpl_pop_init( o2x_o, p2x_2d_p, p2x_3d_p)
 
    write(o_logunit,F00) "EXIT" ; call shr_sys_flush(o_logunit)
 
@@ -251,8 +258,8 @@ contains
 
  end subroutine ocn_init_mct
 
-!================================================================================
-!================================================================================
+!=========================================================================================
+!=========================================================================================
 !BOP
 !
 ! !IROUTINE: ocn_run_mct
@@ -327,7 +334,7 @@ contains
    !----------------------------------------------------------------------------
    write(o_logunit,F01) "map: pop->roms (roms lateral BCs)" ; call shr_sys_flush(o_logunit)
    !----------------------------------------------------------------------------
-   write(o_logunit,*) subname,"TODO: map: pop->roms"
+   call ocpl_map_pop2roms()
 
    !----------------------------------------------------------------------------
    write(o_logunit,F01) "import ocean coupling fields into roms (roms lateral BCs)" ; call shr_sys_flush(o_logunit)
