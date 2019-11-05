@@ -61,11 +61,13 @@ module ocpl_roms_mod
 !EOP
 ! !PRIVATE MODULE VARIABLES
 
-   integer(IN)  :: nestID = 1    ! roms grid/domain #1 
-   type(mct_gsMap), pointer :: gsMap_rc(:)  ! gsMaps for four roms curtians
-   logical      :: iHaveSouth,iHaveEast,iHaveNorth,iHaveWest
-   integer(IN)  ::  localSize,  localISize,  localJSize
-   integer(IN)  :: globalSize, globalISize, globalJSize
+   integer(IN),parameter  :: nestID = 1    ! roms nest (grid/domain) #1 
+   logical      :: iHaveSouth    ! local roms tile includes south boundary
+   logical      :: iHaveEast     ! local roms tile includes east  boundary
+   logical      :: iHaveNorth    ! local roms tile includes north boundary
+   logical      :: iHaveWest     ! local roms tile includes west  boundary
+   integer(IN)  ::  localSize,  localISize,  localJSize   ! local tile size
+   integer(IN)  :: globalSize, globalISize, globalJSize   ! global nest size
 
    integer(IN) :: dbug = 1    ! debug level (higher is more
 
@@ -105,14 +107,15 @@ subroutine ocpl_roms_init()
 
    integer(IN)  :: lSize,m,k
 
-   character(*),parameter :: subName = "(ocpl_roms_init) "
-   character(*),parameter :: F09     = "(a,60('='))"
+   character(*),parameter :: subName =   "(ocpl_roms_init) "
+   character(*),parameter :: F03     = '("(ocpl_roms_init) ",a,2es11.3)'
+   character(*),parameter :: F09     = '("(ocpl_roms_init) ",a," ",60("="))'
 
 !-------------------------------------------------------------------------------
 !  initialize roms curtain BC data types 
 !-------------------------------------------------------------------------------
 
-   write(o_logunit,F09) subname//"Enter" ;  call shr_sys_flush(o_logunit)
+   write(o_logunit,F09) "Enter" ;  call shr_sys_flush(o_logunit)
 
    ! get local sizes from ROMS parameters
    localISize = BOUNDS(nestID)%IendR(MyRank) - BOUNDS(nestID)%IstrR(MyRank) + 1
@@ -138,29 +141,30 @@ subroutine ocpl_roms_init()
    write(o_logunit,*) subName,"nlev_r         = ",nlev_r 
 
    !--------------------------------------------------------------------------------------
-   write(o_logunit,*) subName,"init curtain gsMaps & aVects" ; call shr_sys_flush(o_logunit)
+   write(o_logunit,*) subName,"init curtain gsMaps" ; call shr_sys_flush(o_logunit)
+   !--------------------------------------------------------------------------------------
+   call ocpl_roms_gsMapInit(mpicom_r, OCNID_r)
+
+   !--------------------------------------------------------------------------------------
+   write(o_logunit,*) subName,"init curtain aVects" ; call shr_sys_flush(o_logunit)
    !--------------------------------------------------------------------------------------
 
    ! allocate pop->roms curtain attribute vectors arrays
    allocate( p2x_2d_rc(4       ) )
    allocate( p2x_3d_rc(4,nlev_r) )
 
-   ! create gsMaps for curtain aVects 
-   call ocpl_roms_gsMapInit(mpicom_r, OCNID_r)
-
-   do m = 1, 4   ! for each of four curtains N,E,S,W
+   do k = 1, 4   ! for each of four curtains N,E,S,W
       lsize = 0
-      if (m == k_Scurtain .or. m == k_Ncurtain) lsize = localISize
-      if (m == k_Ecurtain .or. m == k_Wcurtain) lsize = localJSize
+      lSize = mct_gsMap_lsize(gsMap_rc(k), mpicom_r) ! local size wrt to curtain gsMap
 
       !----- init 2d fields specifically for pop/roms coupling -----
-      call mct_aVect_init(p2x_2d_rc(m), rList=ocpl_fields_p2x_2d_fields,lsize=lsize)
-      call mct_aVect_zero(p2x_2d_rc(m))
+      call mct_aVect_init(p2x_2d_rc(k), rList=ocpl_fields_p2x_2d_fields,lsize=lsize)
+      call mct_aVect_zero(p2x_2d_rc(k))
 
       !----- init 3d fields specifically for pop/roms coupling -----
-      do k = 1, nlev_r
-         call mct_aVect_init(p2x_3d_rc(m,k), rList=ocpl_fields_p2x_3d_fields,lsize=lsize)
-         call mct_aVect_zero(p2x_3d_rc(m,k))
+      do m = 1, nlev_r
+         call mct_aVect_init(p2x_3d_rc(k,m), rList=ocpl_fields_p2x_3d_fields,lsize=lsize)
+         call mct_aVect_zero(p2x_3d_rc(k,m))
       enddo
    enddo
 
@@ -177,11 +181,11 @@ subroutine ocpl_roms_init()
    if (dbug > 0) then
       m = k_Scurtain 
       k = k_p2x_2d_So_ssh
-      write(o_logunit,*) subname,"<DEBUG> check south curtain..."
-      write(o_logunit,*) subname,"p2x_2d_rc    ssh  min,max: ",minval(p2x_2d_rc(m)  %rAttr(k,:)),maxval(p2x_2d_rc(m)  %rAttr(k,:))
+      write(o_logunit,F03) "<DEBUG> check south curtain..."
+      write(o_logunit,F03) "p2x_2d_rc    ssh  min,max: ",minval(p2x_2d_rc(m)  %rAttr(k,:)),maxval(p2x_2d_rc(m)  %rAttr(k,:))
       k = k_p2x_3d_So_temp
-      write(o_logunit,*) subname,"p2x_3d_rc(1) temp min,max= ",minval(p2x_3d_rc(m,1)%rAttr(k,:)),maxval(p2x_3d_rc(m,1)%rAttr(k,:))
-      write(o_logunit,*) subname,"p2x_3d_rc(2) temp min,max= ",minval(p2x_3d_rc(m,2)%rAttr(k,:)),maxval(p2x_3d_rc(m,2)%rAttr(k,:))
+      write(o_logunit,F03) "p2x_3d_rc(1) temp min,max= ",minval(p2x_3d_rc(m,1)%rAttr(k,:)),maxval(p2x_3d_rc(m,1)%rAttr(k,:))
+      write(o_logunit,F03) "p2x_3d_rc(2) temp min,max= ",minval(p2x_3d_rc(m,2)%rAttr(k,:)),maxval(p2x_3d_rc(m,2)%rAttr(k,:))
       call shr_sys_flush(o_logunit)
    end if
 
@@ -369,7 +373,10 @@ end subroutine ocpl_roms_import
    else
       call mct_gsMap_init(gsMap_rc(k), indx, comm, compid,        0  , globalJSize)
    endif
+   write(o_logunit,*) subName,"west : size global, local = ", &
+            mct_gsMap_gsize(gsMap_rc(k)),mct_gsMap_lsize(gsMap_rc(k),comm)
    deallocate(indx)
+   write(*,*) subName,"DEBUG west  : lsize = ",mct_gsMap_lsize(gsMap_rc(k),comm)
 
    !----------------------------------------------------------------------------
    ! NORTH next - create index of local cells
@@ -386,9 +393,12 @@ end subroutine ocpl_roms_import
       enddo
       call mct_gsMap_init(gsMap_rc(k), indx, comm, compid, localISize, globalISize)
    else
-      call mct_gsMap_init(gsMap_rc(k), indx, comm, compid,        0  , globalJSize)
+      call mct_gsMap_init(gsMap_rc(k), indx, comm, compid,        0  , globalISize)
    endif
+   write(o_logunit,*) subName,"north: size global, local = ", &
+            mct_gsMap_gsize(gsMap_rc(k)),mct_gsMap_lsize(gsMap_rc(k),comm)
    deallocate(indx)
+   write(*,*) subName,"DEBUG north : lsize = ",mct_gsMap_lsize(gsMap_rc(k),comm)
 
    !----------------------------------------------------------------------------
    ! EAST next - create index of local cells
@@ -407,7 +417,10 @@ end subroutine ocpl_roms_import
    else
       call mct_gsMap_init(gsMap_rc(k), indx, comm, compid,        0  , globalJSize)
    endif
+   write(o_logunit,*) subName,"east : size global, local = ", &
+            mct_gsMap_gsize(gsMap_rc(k)),mct_gsMap_lsize(gsMap_rc(k),comm)
    deallocate(indx)
+   write(*,*) subName,"DEBUG east  : lsize = ",mct_gsMap_lsize(gsMap_rc(k),comm)
 
    !----------------------------------------------------------------------------
    ! SOUTH last - create index of local cells
@@ -424,9 +437,12 @@ end subroutine ocpl_roms_import
       enddo
       call mct_gsMap_init(gsMap_rc(k), indx, comm, compid, localISize, globalISize)
    else
-      call mct_gsMap_init(gsMap_rc(k), indx, comm, compid,        0  , globalJSize)
+      call mct_gsMap_init(gsMap_rc(k), indx, comm, compid,        0  , globalISize)
    endif
+   write(o_logunit,*) subName,"south: size global, local = ", &
+            mct_gsMap_gsize(gsMap_rc(k)),mct_gsMap_lsize(gsMap_rc(k),comm)
    deallocate(indx)
+   write(*,*) subName,"DEBUG south : lsize = ",mct_gsMap_lsize(gsMap_rc(k),comm)
 
    write(o_logunit,*) subname,"Exit" ;  call shr_sys_flush(o_logunit)
 
