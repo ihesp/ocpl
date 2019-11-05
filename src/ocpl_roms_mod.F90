@@ -268,8 +268,10 @@ subroutine ocpl_roms_import()
 
    write(o_logunit,*) subname,"Enter" ;  call shr_sys_flush(o_logunit)
 
+  !--- global gather/scatter: roms curtain forcing not decomposed ---
+
    BOUNDARY_OCPL(nestID) % newdata    = .false.
-   if ( Scurtain) then
+   if ( do_Scurtain) then
       BOUNDARY_OCPL(nestID) % zeta_south = 1.0e30
       BOUNDARY_OCPL(nestID) % ubar_south = 1.0e30
       BOUNDARY_OCPL(nestID) % vbar_south = 1.0e30
@@ -279,7 +281,7 @@ subroutine ocpl_roms_import()
       BOUNDARY_OCPL(nestID) % salt_south = 1.0e30
       BOUNDARY_OCPL(nestID) % newdata    = .true.
    end if
-   if ( Ecurtain) then
+   if ( do_Ecurtain) then
       BOUNDARY_OCPL(nestID) % zeta_east  = 1.0e30
       BOUNDARY_OCPL(nestID) % ubar_east  = 1.0e30
       BOUNDARY_OCPL(nestID) % vbar_east  = 1.0e30
@@ -289,7 +291,7 @@ subroutine ocpl_roms_import()
       BOUNDARY_OCPL(nestID) % salt_east  = 1.0e30
       BOUNDARY_OCPL(nestID) % newdata    = .true.
    end if
-   if ( Ncurtain) then
+   if ( do_Ncurtain) then
       BOUNDARY_OCPL(nestID) % zeta_north = 1.0e30
       BOUNDARY_OCPL(nestID) % ubar_north = 1.0e30
       BOUNDARY_OCPL(nestID) % vbar_north = 1.0e30
@@ -299,7 +301,7 @@ subroutine ocpl_roms_import()
       BOUNDARY_OCPL(nestID) % salt_north = 1.0e30
       BOUNDARY_OCPL(nestID) % newdata    = .true.
    end if
-   if ( Wcurtain) then
+   if ( do_Wcurtain) then
       BOUNDARY_OCPL(nestID) % zeta_west  = 1.0e30
       BOUNDARY_OCPL(nestID) % ubar_west  = 1.0e30
       BOUNDARY_OCPL(nestID) % vbar_west  = 1.0e30
