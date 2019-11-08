@@ -4,7 +4,7 @@ module ocpl_roms_mod
 !=========================================================================================
 
 !BOP
-! !MODULE: roms_comp_mct
+! !MODULE: ocpl_roms_mod
 ! 
 ! !INTERFACE:
 
@@ -22,14 +22,12 @@ module ocpl_roms_mod
    use ocpl_data_mod    ! new ocpl aVect data declarations
 
 ! ROMS internal data types
-   use mod_grid,     only: GRID
-   use mod_param,    only: globalISize0 => Lm,              &
-                           globalJSize0 => Mm,              &
-                           ROMS_levels  => N,               &
-                           Ngrids,                          &
-                           NtileI,NtileJ,                   &
+   use mod_param,    only: globalISize0 => Lm,  &
+                           globalJSize0 => Mm,  &
+                           ROMS_levels  => N,   &
                            BOUNDS
    use mod_parallel, only: MyRank
+   use communicate,  only: master_task,my_task
 
    use mct_mod
 !  use esmf_mod
@@ -38,7 +36,6 @@ module ocpl_roms_mod
    use seq_infodata_mod
    use seq_timemgr_mod
    use shr_file_mod 
-   use shr_cal_mod, only : shr_cal_date2ymd
    use shr_sys_mod
 
    implicit none
@@ -61,16 +58,15 @@ module ocpl_roms_mod
 !EOP
 ! !PRIVATE MODULE VARIABLES
 
-   integer(IN),parameter  :: nestID = 1    ! roms nest (grid/domain) #1 
-   logical      :: iHaveSouth    ! local roms tile includes south boundary
-   logical      :: iHaveEast     ! local roms tile includes east  boundary
-   logical      :: iHaveNorth    ! local roms tile includes north boundary
-   logical      :: iHaveWest     ! local roms tile includes west  boundary
-   integer(IN)  ::  localSize,  localISize,  localJSize   ! local tile size
-   integer(IN)  :: globalSize, globalISize, globalJSize   ! global nest size
+   integer(IN),parameter :: nestID = 1 ! roms nest (grid/domain) #1 
+   logical     :: iHave_Scurtain       ! local roms tile includes south boundary
+   logical     :: iHave_Ecurtain       ! local roms tile includes east  boundary
+   logical     :: iHave_Ncurtain       ! local roms tile includes north boundary
+   logical     :: iHave_Wcurtain       ! local roms tile includes west  boundary
+   integer(IN) ::  localSize,  localISize,  localJSize   ! local tile size
+   integer(IN) :: globalSize, globalISize, globalJSize   ! global nest size
 
-   integer(IN) :: dbug = 1    ! debug level (higher is more
-
+   integer(IN) :: debug = 1    ! debug level (higher is more
 
 !=========================================================================================
 contains
@@ -178,15 +174,20 @@ subroutine ocpl_roms_init()
 !  k_p2x_3d_So_vvel = mct_aVect_indexRA(p2x_3d_r(1),"So_vvel")
 
    !--- DEBUG ---
-   if (dbug > 0) then
-      m = k_Scurtain 
-      k = k_p2x_2d_So_ssh
-      write(o_logunit,F03) "<DEBUG> check south curtain..."
-      write(o_logunit,F03) "p2x_2d_rc    ssh  min,max: ",minval(p2x_2d_rc(m)  %rAttr(k,:)),maxval(p2x_2d_rc(m)  %rAttr(k,:))
-      k = k_p2x_3d_So_temp
-      write(o_logunit,F03) "p2x_3d_rc(1) temp min,max= ",minval(p2x_3d_rc(m,1)%rAttr(k,:)),maxval(p2x_3d_rc(m,1)%rAttr(k,:))
-      write(o_logunit,F03) "p2x_3d_rc(2) temp min,max= ",minval(p2x_3d_rc(m,2)%rAttr(k,:)),maxval(p2x_3d_rc(m,2)%rAttr(k,:))
-      call shr_sys_flush(o_logunit)
+   if (debug > 0) then
+      m = k_Scurtain
+      lSize = mct_gsMap_lsize(gsMap_rc(m), mpicom_r) ! local size wrt to Scurtain
+      if (lsize > 0) then
+         write(*,F03) "<DEBUG> check south curtain..."
+         k = k_p2x_2d_So_ssh
+         write(*,F03) "   p2x_2d_rc    ssh  min,max: ",minval(p2x_2d_rc(m)  %rAttr(k,:)),maxval(p2x_2d_rc(m)  %rAttr(k,:))
+         k = k_p2x_3d_So_temp
+         write(*,F03) "   p2x_3d_rc(1) temp min,max= ",minval(p2x_3d_rc(m,1)%rAttr(k,:)),maxval(p2x_3d_rc(m,1)%rAttr(k,:))
+         write(*,F03) "   p2x_3d_rc(2) temp min,max= ",minval(p2x_3d_rc(m,2)%rAttr(k,:)),maxval(p2x_3d_rc(m,2)%rAttr(k,:))
+      else
+         write(*,F03) "<DEBUG> check south curtain... lSize=0 => interior tile"
+      end if
+      call shr_sys_flush(6)
    end if
 
    !--------------------------------------------------------------------------------------
@@ -257,7 +258,14 @@ subroutine ocpl_roms_import()
 #ifdef _OPENMP
    integer, external :: omp_get_max_threads  ! max number of threads that can execute
 #endif
-   integer           :: ng = 1               ! roms grid/domain #1 
+   type(mct_aVect),allocatable :: roms2D_BC(:)   ! global gather of 2d curtain data
+   type(mct_aVect),allocatable :: roms3D_BC(:,:) ! global gather of 3d curtain data
+   integer(IN) :: i,j,ij                   ! indicies for grid cell
+   integer(IN) :: k,n                      ! indicies for curtain and level
+   integer(IN) :: stat                     ! return code
+   integer(IN) :: kfld                     ! index of some aVect field
+   real(R8)    :: tmin,tmax                ! min/max value of field
+   logical     :: first_call = .true.      ! flags one-time initializations
 
    character(*), parameter :: subName = "(ocpl_roms_import) "
 
@@ -268,47 +276,119 @@ subroutine ocpl_roms_import()
 
    write(o_logunit,*) subname,"Enter" ;  call shr_sys_flush(o_logunit)
 
-  !--- global gather/scatter: roms curtain forcing not decomposed ---
+  !-----------------------------------------------------------------------------
+  ! create global (not decomposed/distributed) curtain aVects
+  !-----------------------------------------------------------------------------
+  if (first_call) then
+     allocate (roms2D_BC(4))
+     allocate (roms3D_BC(4,nlev_r))
+  end if
+  first_call = .false.
 
-   BOUNDARY_OCPL(nestID) % newdata    = .false.
+  !-----------------------------------------------------------------------------
+  ! global gather/broadcast: non-decomposed roms curtain data
+  !-----------------------------------------------------------------------------
+   do k = 1,4  ! for each curtain: N,E,S,W
+      call    mct_aVect_gather(p2x_2d_rc(k), roms2D_BC(k), &
+                                gsMap_rc(k), master_task, mpicom_r, stat)
+      call    mct_aVect_bcast (roms2D_BC(k), master_task, mpicom_r, stat)
+
+      do n = 1,nlev_r
+         call mct_aVect_gather(p2x_3d_rc(k,n), roms3D_BC(k,n), &
+                                gsMap_rc(k)  , master_task, mpicom_r, stat)
+         call mct_aVect_bcast (roms3D_BC(k,n), master_task, mpicom_r, stat)
+      enddo
+   enddo
+
+  !--- check values of global gather/broadcast ---
+   if (debug>0 ) then
+      do k = 1,4  ! for each curtain: N,E,S,W
+         kfld = mct_aVect_indexRA(roms2D_BC(k),"So_ssh" )
+         tmin = minval( roms2D_BC(k)%rAttr(kfld,:) )
+         tmax = maxval( roms2D_BC(k)%rAttr(kfld,:) )
+         write(*,'(2a,i2,2es11.3)') subname,"<DEBUG> global k, ssh  min,max = ",k,tmin,tmax 
+
+         kfld = mct_aVect_indexRA(roms3D_BC(k,1),"So_temp" )
+         tmin = minval( roms3D_BC(k,1)%rAttr(kfld,:) )
+         tmax = maxval( roms3D_BC(k,1)%rAttr(kfld,:) )
+         write(*,'(2a,i2,2es11.3)') subname,"<DEBUG> global k, T(1) min,max = ",k,tmin,tmax 
+         tmin = minval( roms3D_BC(k,2)%rAttr(kfld,:) )
+         tmax = maxval( roms3D_BC(k,2)%rAttr(kfld,:) )
+         write(*,'(2a,i2,2es11.3)') subname,"<DEBUG> global k, T(2) min,max = ",k,tmin,tmax 
+      end do
+   end if
+
+
+  !-----------------------------------------------------------------------------
+  ! unit conversion and vector rotation as per roms internal conventions
+  !-----------------------------------------------------------------------------
+
+  !-----------------------------------------------------------------------------
+  ! put gathered data into roms internal data types 
+  !-----------------------------------------------------------------------------
+   BOUNDARY_OCPL(nestID) % bypass  = .true.  ! tell roms not to use this data (for debugging?)
+   BOUNDARY_OCPL(nestID) % newdata = .false.
    if ( do_Scurtain) then
-      BOUNDARY_OCPL(nestID) % zeta_south = 1.0e30
-      BOUNDARY_OCPL(nestID) % ubar_south = 1.0e30
-      BOUNDARY_OCPL(nestID) % vbar_south = 1.0e30
-      BOUNDARY_OCPL(nestID) %    u_south = 1.0e30
-      BOUNDARY_OCPL(nestID) %    v_south = 1.0e30
-      BOUNDARY_OCPL(nestID) % temp_south = 5.0
-      BOUNDARY_OCPL(nestID) % salt_south = 1.0e30
+      k = k_Ncurtain
+      do i  = 0, globalISize0(nestID) + 1   ! 0-based roms internal data
+         ij = i + 1                         ! 1-based aVect 
+         BOUNDARY_OCPL(nestID) % zeta_south(i) = roms2D_BC(k)%rAttr(k_p2x_2d_So_ssh ,ij) *0.01_r8
+         BOUNDARY_OCPL(nestID) % ubar_south(i) = roms2D_BC(k)%rAttr(k_p2x_2d_So_ubar,ij) *0.01_r8
+         BOUNDARY_OCPL(nestID) % vbar_south(i) = roms2D_BC(k)%rAttr(k_p2x_2d_So_vbar,ij) *0.01_r8
+         do n = 1,nlev_r
+            BOUNDARY_OCPL(nestID) %    u_south(i,n) = roms3D_BC(k,n)%rAttr(k_p2x_3d_So_uvel,ij) *0.01_r8
+            BOUNDARY_OCPL(nestID) %    v_south(i,n) = roms3D_BC(k,n)%rAttr(k_p2x_3d_So_vvel,ij) *0.01_r8
+            BOUNDARY_OCPL(nestID) % temp_south(i,n) = roms3D_BC(k,n)%rAttr(k_p2x_3d_So_temp,ij)
+            BOUNDARY_OCPL(nestID) % salt_south(i,n) = roms3D_BC(k,n)%rAttr(k_p2x_3d_So_salt,ij) *1000.0_r8
+         end do
+      end do
       BOUNDARY_OCPL(nestID) % newdata    = .true.
    end if
    if ( do_Ecurtain) then
-      BOUNDARY_OCPL(nestID) % zeta_east  = 1.0e30
-      BOUNDARY_OCPL(nestID) % ubar_east  = 1.0e30
-      BOUNDARY_OCPL(nestID) % vbar_east  = 1.0e30
-      BOUNDARY_OCPL(nestID) %    u_east  = 1.0e30
-      BOUNDARY_OCPL(nestID) %    v_east  = 1.0e30
-      BOUNDARY_OCPL(nestID) % temp_east  = 1.0e30
-      BOUNDARY_OCPL(nestID) % salt_east  = 1.0e30
+      k = k_Ecurtain
+      do j  = 0, globalJSize0(nestID) + 1   ! 0-based roms internal data
+         ij = j + 1                         ! 1-based aVect 
+         BOUNDARY_OCPL(nestID) % zeta_east (j) = roms2D_BC(k)%rAttr(k_p2x_2d_So_ssh ,ij) *0.01_r8
+         BOUNDARY_OCPL(nestID) % ubar_east (j) = roms2D_BC(k)%rAttr(k_p2x_2d_So_ubar,ij) *0.01_r8
+         BOUNDARY_OCPL(nestID) % vbar_east (j) = roms2D_BC(k)%rAttr(k_p2x_2d_So_vbar,ij) *0.01_r8
+         do n = 1,nlev_r
+            BOUNDARY_OCPL(nestID) %    u_east (j,n) = roms3D_BC(k,n)%rAttr(k_p2x_3d_So_uvel,ij) *0.01_r8
+            BOUNDARY_OCPL(nestID) %    v_east (j,n) = roms3D_BC(k,n)%rAttr(k_p2x_3d_So_vvel,ij) *0.01_r8
+            BOUNDARY_OCPL(nestID) % temp_east (j,n) = roms3D_BC(k,n)%rAttr(k_p2x_3d_So_temp,ij)
+            BOUNDARY_OCPL(nestID) % salt_east (j,n) = roms3D_BC(k,n)%rAttr(k_p2x_3d_So_salt,ij) *1000.0_r8
+         end do
+      end do
       BOUNDARY_OCPL(nestID) % newdata    = .true.
    end if
    if ( do_Ncurtain) then
-      BOUNDARY_OCPL(nestID) % zeta_north = 1.0e30
-      BOUNDARY_OCPL(nestID) % ubar_north = 1.0e30
-      BOUNDARY_OCPL(nestID) % vbar_north = 1.0e30
-      BOUNDARY_OCPL(nestID) %    u_north = 1.0e30
-      BOUNDARY_OCPL(nestID) %    v_north = 1.0e30
-      BOUNDARY_OCPL(nestID) % temp_north = 1.0e30
-      BOUNDARY_OCPL(nestID) % salt_north = 1.0e30
+      k = k_Ncurtain
+      do i  = 0, globalISize0(nestID) + 1   ! 0-based roms internal data
+         ij = i + 1                         ! 1-based aVect 
+         BOUNDARY_OCPL(nestID) % zeta_north(i) = roms2D_BC(k)%rAttr(k_p2x_2d_So_ssh ,ij) *0.01_r8
+         BOUNDARY_OCPL(nestID) % ubar_north(i) = roms2D_BC(k)%rAttr(k_p2x_2d_So_ubar,ij) *0.01_r8
+         BOUNDARY_OCPL(nestID) % vbar_north(i) = roms2D_BC(k)%rAttr(k_p2x_2d_So_vbar,ij) *0.01_r8
+         do n = 1,nlev_r
+            BOUNDARY_OCPL(nestID) %    u_north(i,n) = roms3D_BC(k,n)%rAttr(k_p2x_3d_So_uvel,ij) *0.01_r8
+            BOUNDARY_OCPL(nestID) %    v_north(i,n) = roms3D_BC(k,n)%rAttr(k_p2x_3d_So_vvel,ij) *0.01_r8
+            BOUNDARY_OCPL(nestID) % temp_north(i,n) = roms3D_BC(k,n)%rAttr(k_p2x_3d_So_temp,ij)
+            BOUNDARY_OCPL(nestID) % salt_north(i,n) = roms3D_BC(k,n)%rAttr(k_p2x_3d_So_salt,ij) *1000.0_r8
+         end do
+      end do
       BOUNDARY_OCPL(nestID) % newdata    = .true.
    end if
    if ( do_Wcurtain) then
-      BOUNDARY_OCPL(nestID) % zeta_west  = 1.0e30
-      BOUNDARY_OCPL(nestID) % ubar_west  = 1.0e30
-      BOUNDARY_OCPL(nestID) % vbar_west  = 1.0e30
-      BOUNDARY_OCPL(nestID) %    u_west  = 1.0e30
-      BOUNDARY_OCPL(nestID) %    v_west  = 1.0e30
-      BOUNDARY_OCPL(nestID) % temp_west  = 1.0e30
-      BOUNDARY_OCPL(nestID) % salt_west  = 1.0e30
+      do j  = 0, globalJSize0(nestID) + 1   ! 0-based roms internal data
+         ij = j + 1                         ! 1-based aVect 
+         BOUNDARY_OCPL(nestID) % zeta_west (j) = roms2D_BC(k)%rAttr(k_p2x_2d_So_ssh ,ij) *0.01_r8
+         BOUNDARY_OCPL(nestID) % ubar_west (j) = roms2D_BC(k)%rAttr(k_p2x_2d_So_ubar,ij) *0.01_r8
+         BOUNDARY_OCPL(nestID) % vbar_west (j) = roms2D_BC(k)%rAttr(k_p2x_2d_So_vbar,ij) *0.01_r8
+         do n = 1,nlev_r
+            BOUNDARY_OCPL(nestID) %    u_west (j,n) = roms3D_BC(k,n)%rAttr(k_p2x_3d_So_uvel,ij) *0.01_r8
+            BOUNDARY_OCPL(nestID) %    v_west (j,n) = roms3D_BC(k,n)%rAttr(k_p2x_3d_So_vvel,ij) *0.01_r8
+            BOUNDARY_OCPL(nestID) % temp_west (j,n) = roms3D_BC(k,n)%rAttr(k_p2x_3d_So_temp,ij)
+            BOUNDARY_OCPL(nestID) % salt_west (j,n) = roms3D_BC(k,n)%rAttr(k_p2x_3d_So_salt,ij) *1000.0_r8
+         end do
+      end do
       BOUNDARY_OCPL(nestID) % newdata    = .true.
    end if
 
@@ -361,11 +441,11 @@ end subroutine ocpl_roms_import
    !----------------------------------------------------------------------------
    ! initialize boundary gsMaps for ROMS curtain forcing
    !----------------------------------------------------------------------------
-   iHaveWest = .false.
+   iHave_Wcurtain = .false.
    k = k_Wcurtain
    allocate(indx(localJSize))
    if (BOUNDS(nestID)%IstrR(MyRank).le.1) then
-      iHaveWest = .true.
+      iHave_Wcurtain = .true.
       ij    = 0
       do j  = BOUNDS(nestID)%JstrR(MyRank)+1, BOUNDS(nestID)%JendR(MyRank)+1
          ij = ij + 1
@@ -378,16 +458,16 @@ end subroutine ocpl_roms_import
    write(o_logunit,*) subName,"west : size global, local = ", &
             mct_gsMap_gsize(gsMap_rc(k)),mct_gsMap_lsize(gsMap_rc(k),comm)
    deallocate(indx)
-   write(*,*) subName,"DEBUG west  : lsize = ",mct_gsMap_lsize(gsMap_rc(k),comm)
+   if (debug>0) write(*,*) subName,"DEBUG west  : lsize = ",mct_gsMap_lsize(gsMap_rc(k),comm)
 
    !----------------------------------------------------------------------------
    ! NORTH next - create index of local cells
    !----------------------------------------------------------------------------
-   iHaveNorth = .false.
+   iHave_Ncurtain = .false.
    k = k_Ncurtain
    allocate(indx(localISize))
    if (BOUNDS(nestID)%JendR(MyRank)+1.eq.globalJSize) then
-      iHaveNorth = .true.
+      iHave_Ncurtain = .true.
       ij    = 0
       do i  = BOUNDS(nestID)%IstrR(MyRank)+1, BOUNDS(nestID)%IendR(MyRank)+1
          ij = ij + 1
@@ -400,16 +480,16 @@ end subroutine ocpl_roms_import
    write(o_logunit,*) subName,"north: size global, local = ", &
             mct_gsMap_gsize(gsMap_rc(k)),mct_gsMap_lsize(gsMap_rc(k),comm)
    deallocate(indx)
-   write(*,*) subName,"DEBUG north : lsize = ",mct_gsMap_lsize(gsMap_rc(k),comm)
+   if (debug>0) write(*,*) subName,"DEBUG north : lsize = ",mct_gsMap_lsize(gsMap_rc(k),comm)
 
    !----------------------------------------------------------------------------
    ! EAST next - create index of local cells
    !----------------------------------------------------------------------------
-   iHaveEast = .false.
+   iHave_Ecurtain = .false.
    k = k_Ecurtain
    allocate(indx(localJSize))
    if (BOUNDS(nestID)%IendR(MyRank)+1.eq.globalISize) then
-      iHaveEast = .true.
+      iHave_Ecurtain = .true.
       ij    = 0
       do j  = BOUNDS(nestID)%JstrR(MyRank)+1, BOUNDS(nestID)%JendR(MyRank)+1
          ij = ij + 1
@@ -422,16 +502,16 @@ end subroutine ocpl_roms_import
    write(o_logunit,*) subName,"east : size global, local = ", &
             mct_gsMap_gsize(gsMap_rc(k)),mct_gsMap_lsize(gsMap_rc(k),comm)
    deallocate(indx)
-   write(*,*) subName,"DEBUG east  : lsize = ",mct_gsMap_lsize(gsMap_rc(k),comm)
+   if (debug>0) write(*,*) subName,"DEBUG east  : lsize = ",mct_gsMap_lsize(gsMap_rc(k),comm)
 
    !----------------------------------------------------------------------------
    ! SOUTH last - create index of local cells
    !----------------------------------------------------------------------------
-   iHaveSouth = .false.
+   iHave_Scurtain = .false.
    k = k_Scurtain
    allocate(indx(localISize))
    if (BOUNDS(nestID)%JstrR(MyRank).le.1) then
-      iHaveSouth = .true.
+      iHave_Scurtain = .true.
       ij    = 0
       do i  = BOUNDS(nestID)%IstrR(MyRank)+1, BOUNDS(nestID)%IendR(MyRank)+1
          ij       = ij + 1
@@ -444,7 +524,7 @@ end subroutine ocpl_roms_import
    write(o_logunit,*) subName,"south: size global, local = ", &
             mct_gsMap_gsize(gsMap_rc(k)),mct_gsMap_lsize(gsMap_rc(k),comm)
    deallocate(indx)
-   write(*,*) subName,"DEBUG south : lsize = ",mct_gsMap_lsize(gsMap_rc(k),comm)
+   if (debug>0) write(*,*) subName,"DEBUG south : lsize = ",mct_gsMap_lsize(gsMap_rc(k),comm)
 
    write(o_logunit,*) subname,"Exit" ;  call shr_sys_flush(o_logunit)
 
