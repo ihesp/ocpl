@@ -126,11 +126,17 @@ contains
 
    call shr_file_getLogUnit (shrlogunit) ! save log unit
    call shr_file_getLogLevel(shrloglev)  ! save log level
-   o_logUnit = shr_file_getUnit()        ! get/reserve unused unit number for ocpl's logUnit
-   call shr_file_setIO("ocn_modelio.nml",o_logUnit)  ! assign ocpl logUnit to log file
+   call seq_cdata_setptrs(cdata_o, ID=OCNID_o)
+   if (seq_comm_iamroot(OCNID_o)) then       ! set logUnit to ocn.log.*
+      o_logUnit = shr_file_getUnit()        ! get/reserve unused unit number for ocpl's logUnit
+      call shr_file_setIO("ocn_modelio.nml",o_logUnit)  ! assign ocpl logUnit to a named file
+      call shr_file_setLogUnit (o_logunit)  ! set shared logUnit = ocpl's logUnit
+      call shr_file_setLogLevel(1)
+   else
+      o_logUnit = shrlogunit ! wherever cpl was using for non-root logunit, presumably cesm.log.*
+   endif
    pop_logUnit  = o_logUnit              ! set pop    logUnit = ocpl's logUnit
    roms_logUnit = o_logUnit              ! set roms   logUnit = ocpl's logUnit
-   call shr_file_setLogUnit (o_logunit)  ! set shared logUnit = ocpl's logUnit
 
    write(o_logUnit,F00) " ENTER"
    ncomp = OCNID(1)
