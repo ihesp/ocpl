@@ -112,6 +112,7 @@ subroutine ocpl_roms_init()
 !-------------------------------------------------------------------------------
 
    write(o_logunit,F09) "Enter" ;  call shr_sys_flush(o_logunit)
+   if (debug>0) write(o_logunit,'(2a,i3)') subName,"debug level = ",debug
 
    ! get local sizes from ROMS parameters
    localISize = BOUNDS(nestID)%IendR(MyRank) - BOUNDS(nestID)%IstrR(MyRank) + 1
@@ -178,14 +179,14 @@ subroutine ocpl_roms_init()
       m = k_Scurtain
       lSize = mct_gsMap_lsize(gsMap_rc(m), mpicom_r) ! local size wrt to Scurtain
       if (lsize > 0) then
-         write(o_logUnit,F03) "<DEBUG> check south curtain..."
+         write(o_logUnit,F03) "check south curtain..."
          k = k_p2x_2d_So_ssh
          write(o_logUnit,F03) "   p2x_2d_rc    ssh  min,max: ",minval(p2x_2d_rc(m)  %rAttr(k,:)),maxval(p2x_2d_rc(m)  %rAttr(k,:))
          k = k_p2x_3d_So_temp
          write(o_logUnit,F03) "   p2x_3d_rc(1) temp min,max= ",minval(p2x_3d_rc(m,1)%rAttr(k,:)),maxval(p2x_3d_rc(m,1)%rAttr(k,:))
-         write(o_logUnit,F03) "   p2x_3d_rc(2) temp min,max= ",minval(p2x_3d_rc(m,2)%rAttr(k,:)),maxval(p2x_3d_rc(m,2)%rAttr(k,:))
+         write(o_logUnit,F03) "   p2x_3d_rc(9) temp min,max= ",minval(p2x_3d_rc(m,9)%rAttr(k,:)),maxval(p2x_3d_rc(m,9)%rAttr(k,:))
       else
-         write(o_logUnit,F03) "<DEBUG> check south curtain... lSize=0 => interior tile"
+         write(o_logUnit,F03) "check south curtain... lSize=0 => interior tile"
       end if
       call shr_sys_flush(6)
    end if
@@ -226,7 +227,7 @@ subroutine ocpl_roms_init()
    BOUNDARY_OCPL(nestID) % salt_north = 1.0e30
    BOUNDARY_OCPL(nestID) % newdata    = .false.
 
-   write(o_logunit,*) subname,"Exit" ;  call shr_sys_flush(o_logunit)
+   write(o_logunit,'(2a)') subname,"Exit" ;  call shr_sys_flush(o_logunit)
 
 end subroutine ocpl_roms_init
 
@@ -276,7 +277,8 @@ subroutine ocpl_roms_import()
 !  note: roms uses BC temperature units of Celcius (not Kelvin)
 !-------------------------------------------------------------------------------
 
-   write(o_logunit,'(a)') subname,"Enter" ;  call shr_sys_flush(o_logunit)
+   write(o_logunit,'(2a)') subname,"Enter" ;  call shr_sys_flush(o_logunit)
+   if (debug>0) write(o_logunit,'(2a,i3)') subName,"debug level = ",debug
 
   !-----------------------------------------------------------------------------
   ! create global (not decomposed/distributed) curtain aVects
@@ -308,15 +310,15 @@ subroutine ocpl_roms_import()
          kfld = mct_aVect_indexRA(roms2D_BC(k),"So_ssh" )
          tmin = minval( roms2D_BC(k)%rAttr(kfld,:) )
          tmax = maxval( roms2D_BC(k)%rAttr(kfld,:) )
-         write(o_logUnit,'(2a,i2,2es11.3)') subname,"<DEBUG> global k, ssh  min,max = ",k,tmin,tmax 
+         write(o_logUnit,'(2a,i2,2es11.3)') subname,"global k, ssh   min,max = ",k,tmin,tmax 
 
          kfld = mct_aVect_indexRA(roms3D_BC(k,1),"So_temp" )
          tmin = minval( roms3D_BC(k,1)%rAttr(kfld,:) )
          tmax = maxval( roms3D_BC(k,1)%rAttr(kfld,:) )
-         write(o_logUnit,'(2a,i2,2es11.3)') subname,"<DEBUG> global k, T(1) min,max = ",k,tmin,tmax 
-         tmin = minval( roms3D_BC(k,2)%rAttr(kfld,:) )
-         tmax = maxval( roms3D_BC(k,2)%rAttr(kfld,:) )
-         write(o_logUnit,'(2a,i2,2es11.3)') subname,"<DEBUG> global k, T(2) min,max = ",k,tmin,tmax 
+         write(o_logUnit,'(2a,i2,2es11.3)') subname,"global k, T bot min,max = ",k,tmin,tmax 
+         tmin = minval( roms3D_BC(k,nlev_r)%rAttr(kfld,:) )
+         tmax = maxval( roms3D_BC(k,nlev_r)%rAttr(kfld,:) )
+         write(o_logUnit,'(2a,i2,2es11.3)') subname,"global k, T top min,max = ",k,tmin,tmax 
       end do
    end if
 
@@ -395,7 +397,7 @@ subroutine ocpl_roms_import()
       BOUNDARY_OCPL(nestID) % newdata    = .true.
    end if
 
-   write(o_logunit,'(a)') subname,"Exit" ;  call shr_sys_flush(o_logunit)
+   write(o_logunit,'(2a)') subname,"Exit" ;  call shr_sys_flush(o_logunit)
 
 end subroutine ocpl_roms_import
 
@@ -437,7 +439,8 @@ end subroutine ocpl_roms_import
 ! surface forcing aVect gsMaps are created by roms component
 !-------------------------------------------------------------------------------
 
-   write(o_logunit,*) subname,"Enter" ;  call shr_sys_flush(o_logunit)
+   write(o_logunit,'(2a)') subname,"Enter" ;  call shr_sys_flush(o_logunit)
+   if (debug>0) write(o_logunit,'(2a,i3)') subName,"debug level = ",debug
 
    allocate(gsMap_rc(4)) ! allocate for four BC curtains
 
@@ -461,7 +464,6 @@ end subroutine ocpl_roms_import
    write(o_logunit,*) subName,"west : size global, local = ", &
             mct_gsMap_gsize(gsMap_rc(k)),mct_gsMap_lsize(gsMap_rc(k),comm)
    deallocate(indx)
-   if (debug>0) write(o_logUnit,*) subName,"DEBUG west  : lsize = ",mct_gsMap_lsize(gsMap_rc(k),comm)
 
    !----------------------------------------------------------------------------
    ! NORTH next - create index of local cells
@@ -483,7 +485,6 @@ end subroutine ocpl_roms_import
    write(o_logunit,*) subName,"north: size global, local = ", &
             mct_gsMap_gsize(gsMap_rc(k)),mct_gsMap_lsize(gsMap_rc(k),comm)
    deallocate(indx)
-   if (debug>0) write(o_logUnit,*) subName,"DEBUG north : lsize = ",mct_gsMap_lsize(gsMap_rc(k),comm)
 
    !----------------------------------------------------------------------------
    ! EAST next - create index of local cells
@@ -505,7 +506,6 @@ end subroutine ocpl_roms_import
    write(o_logunit,*) subName,"east : size global, local = ", &
             mct_gsMap_gsize(gsMap_rc(k)),mct_gsMap_lsize(gsMap_rc(k),comm)
    deallocate(indx)
-   if (debug>0) write(o_logUnit,*) subName,"DEBUG east  : lsize = ",mct_gsMap_lsize(gsMap_rc(k),comm)
 
    !----------------------------------------------------------------------------
    ! SOUTH last - create index of local cells
@@ -527,9 +527,8 @@ end subroutine ocpl_roms_import
    write(o_logunit,*) subName,"south: size global, local = ", &
             mct_gsMap_gsize(gsMap_rc(k)),mct_gsMap_lsize(gsMap_rc(k),comm)
    deallocate(indx)
-   if (debug>0) write(o_logUnit,*) subName,"DEBUG south : lsize = ",mct_gsMap_lsize(gsMap_rc(k),comm)
 
-   write(o_logunit,*) subname,"Exit" ;  call shr_sys_flush(o_logunit)
+   write(o_logunit,'(2a)') subname,"Exit" ;  call shr_sys_flush(o_logunit)
 
 end subroutine ocpl_roms_gsMapInit
 

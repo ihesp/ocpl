@@ -30,7 +30,8 @@ module ocpl_pop_mod
 !  use POP_IOUnitsMod
    use POP_MCT_vars_mod
 
-   use ocpl_fields_mod
+   use ocpl_fields_mod  
+   use ocpl_data_mod
 
 #ifdef OCPLRESTORING
    use forcing_pt_interior, only: PT_INTERIOR_DATA     ! alter interal pop data for 2-way coupling
@@ -116,7 +117,7 @@ module ocpl_pop_mod
 
    type(seq_infodata_type), pointer :: infodata   
 
-   integer(IN) :: dbug = 0    ! debug level (higher is more)
+   integer(IN) :: dbug = 1    ! debug level (higher is more)
 
 !=========================================================================================
 contains
@@ -147,7 +148,7 @@ subroutine ocpl_pop_init( p2x_p, p2x_2d_p, p2x_3d_p)
 !  use domain_size, only: km  ! # vertical levels, for 3d coupling
 
    integer(int_kind) :: lsize              ! size of local aVect
-   integer(int_kind) :: k                  ! array index
+   integer(int_kind) :: k,n                ! array index
 #ifdef _OPENMP
    integer, external :: omp_get_max_threads  ! max number of threads that can execute
 #endif
@@ -158,7 +159,7 @@ subroutine ocpl_pop_init( p2x_p, p2x_2d_p, p2x_3d_p)
 !
 !------------------------------------------------------------------------------------------
 
-   write(o_logunit,*) subname,"Enter"
+   write(o_logunit,'(2a)') subname,"Enter"
 
    nlev_p = km
    lsize = mct_aVect_lsize( p2x_p )
@@ -166,15 +167,18 @@ subroutine ocpl_pop_init( p2x_p, p2x_2d_p, p2x_3d_p)
    !----- init 2d fields specifically for pop/roms coupling -----
    call mct_aVect_init(p2x_2d_p, rList=ocpl_fields_p2x_2d_fields,lsize=lsize)
    call mct_aVect_zero(p2x_2d_p)
+   p2x_2d_p%rAttr(:,:) = 1.0e30
 
    !----- init 3d fields specifically for pop/roms coupling -----
-   write(o_logunit,*) subName,"     nlev_p    = ",nlev_p
+   write(o_logunit,'(2a,i4)') subName,"     nlev_p    = ",nlev_p
    allocate(p2x_3d_p(nlev_p))
 
    do k = 1, nlev_p
       call mct_aVect_init(p2x_3d_p(k), rList=ocpl_fields_p2x_3d_fields,lsize=lsize)
       call mct_aVect_zero(p2x_3d_p(k))
+      p2x_3d_p(k)%rAttr(:,:) = 1.0e30
    enddo
+
 
    !--- set aVect field indicies ---
    k_p2x_2d_So_ssh  = mct_aVect_indexRA(p2x_2d_p   ,"So_ssh" )
@@ -188,14 +192,14 @@ subroutine ocpl_pop_init( p2x_p, p2x_2d_p, p2x_3d_p)
    !--- DEBUG ---
    if (dbug > 0) then
       k = k_p2x_2d_So_ssh
-      write(o_logunit,*) subname,"p2x_2d_p    ssh  min,max: ",minval(p2x_2d_p   %rAttr(k,:)),maxval(p2x_2d_p   %rAttr(k,:))
+      write(o_logunit,'(2a,2e11.3)') subname,"p2x_2d_p    ssh  min,max: ",minval(p2x_2d_p   %rAttr(k,:)),maxval(p2x_2d_p   %rAttr(k,:))
       k = k_p2x_3d_So_temp
-      write(o_logunit,*) subname,"p2x_3d_p(1) temp min,max= ",minval(p2x_3d_p(1)%rAttr(k,:)),maxval(p2x_3d_p(1)%rAttr(k,:))
-      write(o_logunit,*) subname,"p2x_3d_p(2) temp min,max= ",minval(p2x_3d_p(2)%rAttr(k,:)),maxval(p2x_3d_p(1)%rAttr(k,:))
+      write(o_logunit,'(2a,2e11.3)') subname,"p2x_3d_p(1) temp min,max= ",minval(p2x_3d_p(1)%rAttr(k,:)),maxval(p2x_3d_p(1)%rAttr(k,:))
+      write(o_logunit,'(2a,2e11.3)') subname,"p2x_3d_p(9) temp min,max= ",minval(p2x_3d_p(9)%rAttr(k,:)),maxval(p2x_3d_p(1)%rAttr(k,:))
       call flushm (o_logunit)
    end if
 
-   write(o_logunit,*) subname,"Exit"
+   write(o_logunit,'(2a)') subname,"Exit"
 
 end subroutine ocpl_pop_init
 
@@ -221,20 +225,22 @@ subroutine ocpl_pop_export( p2x_2d_p, p2x_3d_p)
    type(mct_aVect)             , intent(inout) :: p2x_2d_p
    type(mct_aVect),pointer     , intent(inout) :: p2x_3d_p(:)
 
+   type(mct_aVect) :: global_p  !  for debug global gather test
 !EOP
 !BOC
 
 !-----------------------------------------------------------------------------------------
 !  local variables
-!-----------------------------------------------------------------------------------------
-
-!  use domain_size, only: km  ! # vertical levels, for 3d coupling
 
 #ifdef _OPENMP
    integer, external :: omp_get_max_threads  ! max number of threads that can execute
 #endif
 
    integer(IN) :: k,i,j,n,kuse
+   integer(IN) :: lsize,ier
+   integer(IN) :: master_task = 0     ! PID 0 is the master task
+   real(R8)    :: x_min,x_max         ! debug test values
+
    integer(IN) :: iblock              ! block index
    type(block) :: this_block          ! block information for current block
 
@@ -251,9 +257,8 @@ subroutine ocpl_pop_export( p2x_2d_p, p2x_3d_p)
 !  Q: do pop velocities need to be rotated?
 !------------------------------------------------------------------------------
 
-   write(o_logunit,*) subname,"Enter" ; call flushm (o_logunit)
+   write(o_logunit,'(2a)') subname,"Enter" ; call flushm (o_logunit)
 
-   p2x_2d_p%rAttr(:,:) = 1.0e30
    n = 0
    do iblock = 1,nblocks_clinic
       this_block = get_block(blocks_clinic(iblock),iblock)
@@ -270,13 +275,13 @@ subroutine ocpl_pop_export( p2x_2d_p, p2x_3d_p)
 
       do j = this_block%jb,this_block%je
       do i = this_block%ib,this_block%ie
-         n = n + 1
+         n = n + 1 ! local aVect index
          p2x_2d_p%rAttr(k_p2x_2d_So_ssh ,n) =      PSURF(i,j,curtime,iblock)/grav
          p2x_2d_p%rAttr(k_p2x_2d_So_ubar,n) = WORK1_ocpl(i,j)
          p2x_2d_p%rAttr(k_p2x_2d_So_vbar,n) = WORK2_ocpl(i,j)
          do k = 1,km
             if (KMT(i,j,iblock).gt.0) then
-               kuse = min(k, KMT(i,j,iblock))
+               kuse = min(k, KMT(i,j,iblock)) ! fill column from above
                p2x_3d_p(k)%rAttr(k_p2x_3d_So_temp,n) = TRACER(i,j,kuse,1,curtime,iblock)
                p2x_3d_p(k)%rAttr(k_p2x_3d_So_salt,n) = TRACER(i,j,kuse,2,curtime,iblock)
                p2x_3d_p(k)%rAttr(k_p2x_3d_So_uvel,n) = WORK3_ocpl(i,j,kuse)
@@ -289,15 +294,61 @@ subroutine ocpl_pop_export( p2x_2d_p, p2x_3d_p)
 
    !--- DEBUG ---
    if (dbug > 0) then
-      k = k_p2x_2d_So_ssh
-      write(o_logunit,*) subname,"p2x_2d_p    ssh  min,max: ",minval(p2x_2d_p   %rAttr(k,:)),maxval(p2x_2d_p   %rAttr(k,:))
-      k = k_p2x_3d_So_temp
-      write(o_logunit,*) subname,"p2x_3d_p(1) temp min,max= ",minval(p2x_3d_p(1)%rAttr(k,:)),maxval(p2x_3d_p(1)%rAttr(k,:))
-      write(o_logunit,*) subname,"p2x_3d_p(2) temp min,max= ",minval(p2x_3d_p(2)%rAttr(k,:)),maxval(p2x_3d_p(1)%rAttr(k,:))
+      !--- Note: tentitively gsMap_o is the pop gsMap and gsMap_p doesn't exist ---
+      call mct_aVect_gather(p2x_2d_p, global_p, gsMap_o, master_task, mpicom_o, ier)
+
+      if (seq_comm_iamroot(OCNID_o)) then
+        lsize = mct_aVect_lsize(global_p)
+        write(o_logunit,'(2a,i7)') subname,"global lsize = ",lsize
+        write(o_logunit,'(2a,i7)') subname,"Note: vertical columns filled from above"
+      end if
+
+      if (seq_comm_iamroot(OCNID_o)) then
+         k = k_p2x_2d_So_ssh
+         x_min =  1.0e30
+         x_max = -1.0e30
+         do n=1,lsize
+            if (global_p%rAttr(k,n) < 1.0e10) then
+               x_min = min(x_min,global_p%rAttr(k,n))
+               x_max = max(x_max,global_p%rAttr(k,n))
+            end if
+         end do
+         write(o_logunit,'(2a,2es11.3)') subname,"global  ssh  min,max: ",x_min,x_max
+      end if
+
+      call mct_aVect_gather(p2x_3d_p(1), global_p, gsMap_o, master_task, mpicom_o, ier)
+      if (seq_comm_iamroot(OCNID_o)) then
+         k = k_p2x_3d_So_temp
+         !---------------------
+         x_min =  1.0e30
+         x_max = -1.0e30
+         do n=1,lsize
+            if (global_p%rAttr(k,n) < 1.0e10) then
+               x_min = min(x_min,global_p%rAttr(k,n))
+               x_max = max(x_max,global_p%rAttr(k,n))
+            end if
+         end do
+         write(o_logunit,'(2a,2es11.3)') subname,"global  sst  min,max: ",x_min,x_max
+      end if
+      call mct_aVect_gather(p2x_3d_p(9), global_p, gsMap_o, master_task, mpicom_o, ier)
+      if (seq_comm_iamroot(OCNID_o)) then
+         k = k_p2x_3d_So_temp
+         !---------------------
+         x_min =  1.0e30
+         x_max = -1.0e30
+         do n=1,lsize
+            if (global_p%rAttr(k,n) < 1.0e10) then
+               x_min = min(x_min,global_p%rAttr(k,n))
+               x_max = max(x_max,global_p%rAttr(k,n))
+            end if
+         end do
+         write(o_logunit,'(2a,2es11.3)') subname,"global T(9)  min,max: ",x_min,x_max
+      end if
+         
       call flushm (o_logunit)
    end if
 
-   write(o_logunit,*) subname,"Exit" ; call flushm (o_logunit)
+   write(o_logunit,'(2a)') subname,"Exit" ; call flushm (o_logunit)
 
 end subroutine ocpl_pop_export
 

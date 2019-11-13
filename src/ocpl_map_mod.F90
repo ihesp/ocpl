@@ -99,7 +99,8 @@ subroutine ocpl_map_init()
 !  
 !-----------------------------------------------------------------------------------------
 
-   write(o_logUnit,*) subname,"Enter" ;  call shr_sys_flush(o_logUnit)
+   write(o_logUnit,'(2a)') subname,"Enter" ;  call shr_sys_flush(o_logUnit)
+   if (debug>0) write(o_logUnit,'(2a,i2)') subname,"debug level = ",debug
 
    !--------------------------------------------------------------------------------------
    write(o_logUnit,*) subname,"Init pop->roms curtain maps"
@@ -112,7 +113,7 @@ subroutine ocpl_map_init()
       write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
       call shr_mct_sMatPInitnc(sMatp_p2rc(k),gsMap_o,gsMap_rc(k),trim(mapfile),trim(maptype),mpicom_o)
    else
-      write(o_logUnit,*) subname,"do_Scurtain = false" ;  call shr_sys_flush(o_logUnit)
+      write(o_logUnit,'(2a)') subname,"do_Scurtain = false" ;  call shr_sys_flush(o_logUnit)
    end if
 
    if (do_Ecurtain) then
@@ -122,7 +123,7 @@ subroutine ocpl_map_init()
       write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
       call shr_mct_sMatPInitnc(sMatp_p2rc(k),gsMap_o,gsMap_rc(k),trim(mapfile),trim(maptype),mpicom_o)
    else
-      write(o_logUnit,*) subname,"do_Ecurtain = false" ;  call shr_sys_flush(o_logUnit)
+      write(o_logUnit,'(2a)') subname,"do_Ecurtain = false" ;  call shr_sys_flush(o_logUnit)
    end if
 
    if (do_Ncurtain) then
@@ -132,7 +133,7 @@ subroutine ocpl_map_init()
       write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
       call shr_mct_sMatPInitnc(sMatp_p2rc(k),gsMap_o,gsMap_rc(k),trim(mapfile),trim(maptype),mpicom_o)
    else
-      write(o_logUnit,*) subname,"do_Ncurtain = false" ;  call shr_sys_flush(o_logUnit)
+      write(o_logUnit,'(2a)') subname,"do_Ncurtain = false" ;  call shr_sys_flush(o_logUnit)
    end if
 
    if (do_Wcurtain) then
@@ -142,10 +143,10 @@ subroutine ocpl_map_init()
       write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
       call shr_mct_sMatPInitnc(sMatp_p2rc(k),gsMap_o,gsMap_rc(k),trim(mapfile),trim(maptype),mpicom_o)
    else
-      write(o_logUnit,*) subname,"Wcurtain = false" ;  call shr_sys_flush(o_logUnit)
+      write(o_logUnit,'(2a)') subname,"Wcurtain = false" ;  call shr_sys_flush(o_logUnit)
    end if
 
-   write(o_logUnit,*) subname,"Exit" ;  call shr_sys_flush(o_logUnit)
+   write(o_logUnit,'(2a)') subname,"Exit" ;  call shr_sys_flush(o_logUnit)
 
 end subroutine ocpl_map_init
 
@@ -203,7 +204,7 @@ subroutine ocpl_map_pop2roms()
    type(mct_aVect),allocatable,save :: p2x_3d_pvert_rc(:,:) ! aVect on roms horiz grid but pop vertical grid
 
    integer(IN) :: kfld                ! field index
-   real(R8)    :: tmin,tmax           ! debug info
+   real(R8)    :: xmin,xmax           ! debug info
 
    character(*), parameter :: subName = "(ocpl_map_pop2roms) "
 
@@ -213,16 +214,32 @@ subroutine ocpl_map_pop2roms()
 !  
 !-----------------------------------------------------------------------------------------
 
-   write(o_logUnit,'(a)') subname,"Enter" ;  call shr_sys_flush(o_logUnit)
+   write(o_logUnit,'(2a)') subname,"Enter" ;  call shr_sys_flush(o_logUnit)
+   if (debug>0) write(o_logUnit,'(2a,i2)') subname,"debug level = ",debug
 
    !--------------------------------------------------------------------------------------
    ! debug/sanity-check on data
    !--------------------------------------------------------------------------------------
    if (debug > 0) then
-      write(o_logUnit,'(2a,5i6)') subName,'<DEBUG> lsize: pop, S,N,W,E = ', &
-         mct_aVect_lsize(p2x_2d_p), &
-         mct_aVect_lsize(p2x_2d_rc(k_Scurtain)), mct_aVect_lsize(p2x_2d_rc(k_Ncurtain)), & 
-         mct_aVect_lsize(p2x_2d_rc(k_Wcurtain)), mct_aVect_lsize(p2x_2d_rc(k_Ecurtain))
+      write(o_logUnit,'(2a,i5)') subName,"pop lsize = ",mct_aVect_lsize(p2x_2d_p)
+      do k=1,4 ! four curtains: N,E,S,W
+         if (k==k_Scurtain) then
+            lsize = mct_aVect_lsize(p2x_2d_rc(k_Scurtain))
+            write(o_logUnit,'(2a,i2,L2,i4)') subname,"S curtain: k, do_mapping, lsize = ",k,do_Scurtain,lsize
+         end if
+         if (k==k_Ecurtain) then
+            lsize = mct_aVect_lsize(p2x_2d_rc(k_Ecurtain))
+            write(o_logUnit,'(2a,i2,L2,i4)') subname,"E curtain: k, do_mapping, lsize = ",k,do_Ecurtain,lsize
+         end if
+         if (k==k_Ncurtain) then
+            lsize = mct_aVect_lsize(p2x_2d_rc(k_Ncurtain))
+            write(o_logUnit,'(2a,i2,L2,i4)') subname,"N curtain: k, do_mapping, lsize = ",k,do_Ncurtain,lsize
+         end if
+         if (k==k_Wcurtain) then
+            lsize = mct_aVect_lsize(p2x_2d_rc(k_Wcurtain))
+            write(o_logUnit,'(2a,i2,L2,i4)') subname,"W curtain: k, do_mapping, lsize = ",k,do_Wcurtain,lsize
+         end if
+      end do
    endif
 
    !--------------------------------------------------------------------------------------
@@ -237,18 +254,18 @@ subroutine ocpl_map_pop2roms()
       if (k==k_Ncurtain .and. do_Ncurtain==.true.) do_mapping = .true.
       if (k==k_Wcurtain .and. do_Wcurtain==.true.) do_mapping = .true.
 
-      if (debug>0) write(o_logUnit,*) subName,"<DEBUG> 2d map for curtain ",k,", do_mapping =",do_mapping
       if (do_mapping) call mct_sMat_avMult(p2x_2d_p,sMatp_p2rc(k),p2x_2d_rc(k))
 
       if (debug>0 ) then
-         tmin = -999.
-         tmax = -999.
-         if (mct_aVect_lsize(p2x_2d_rc(k)) > 0 ) then
+         lsize = mct_aVect_lsize(p2x_2d_rc(k))
+         if ( lsize > 0 ) then
             kfld = mct_aVect_indexRA(p2x_2d_rc(k),"So_ssh" )
-            tmin = minval(p2x_3d_p(1)%rAttr(kfld,:))
-            tmax = maxval(p2x_3d_p(1)%rAttr(kfld,:))
+            xmin = minval(p2x_2d_rc(k)%rAttr(kfld,:))
+            xmax = maxval(p2x_2d_rc(k)%rAttr(kfld,:))
+            write(o_logUnit,'(2a,i2,2es11.3)') subname,"2d map: k, rc ssh min,max = ",k,xmin,xmax 
+         else
+            write(o_logUnit,'(2a,i3,a)')       subName,"2d map: k = ",k," lsize = 0 => no mapping"
          end if
-         write(o_logUnit,'(2a,i2,2es11.3)') subname,"<DEBUG> k, ssh min,max = ",k,tmin,tmax 
       end if
    end do
 
@@ -287,35 +304,27 @@ subroutine ocpl_map_pop2roms()
       if (k==k_Ncurtain .and. do_Ncurtain==.true.) do_mapping = .true.
       if (k==k_Wcurtain .and. do_Wcurtain==.true.) do_mapping = .true.
 
-      if (debug>0) write(o_logUnit,*) subName,"<DEBUG> 3d map for curtain ",k,", do_mapping =",do_mapping
-
       if (do_mapping) then
-         lsize = mct_aVect_lsize (p2x_3d_rc(k,1))
 
          !--- horizontal mapping, for each pop vertical level (global operation) --------
          do np=1,nlev_p
             call mct_sMat_avMult(p2x_3d_p(np),sMatp_p2rc(k),p2x_3d_pvert_rc(k,np))
-            if (debug>0 .and.  mod(nr-1,10)==0 ) then
-               kfld = k_p2x_3d_So_temp
-               write(o_logUnit,'(2a,3i3,2es11.3)') subName,"<DEBUG> pop   T:k,np,kfld,min,max=",k,np,kfld, &
-                  minval(p2x_3d_p         (np)%rAttr(kfld,:)), &
-                  maxval(p2x_3d_p         (np)%rAttr(kfld,:))
-               write(o_logUnit,'(2a,3i3,2es11.3)') subName,"<DEBUG> So_temp:k,np,kfld,min,max=",k,np,kfld, &
-                  minval(p2x_3d_pvert_rc(k,np)%rAttr(kfld,:)), &
-                  maxval(p2x_3d_pvert_rc(k,np)%rAttr(kfld,:))
-            end if
-
-         !  if (np>1 .and. ??? ) then  ! fill in value from layer above
-         !     p2x_3d_pvert_rc(k,np)%aVect(:,:) = p2x_3d_pvert_rc(k,np-1)%aVect(:,:)  
-         !  end if
          end do
+
+         lsize = mct_aVect_lsize (p2x_3d_rc(k,1))
+         if (debug>0 .and. lsize > 0) then
+            kfld = mct_aVect_indexRA(p2x_3d_rc(k,1),"So_temp" )
+            xmin = minval(p2x_3d_pvert_rc(k,1)%rAttr(kfld,:))
+            xmax = maxval(p2x_3d_pvert_rc(k,1)%rAttr(kfld,:))
+            write(o_logUnit,'(2a,i2,2es11.3)') subname,"3d map: k, pvert_rc SST min,max = ",k,xmin,xmax 
+         end if
 
          !--- vertical interpolation to roms layers (local operation) -------------------
          if (lsize > 0) then
          do nr=1,nlev_r ! for each roms level
             call mct_aVect_zero(p2x_3d_rc(k,nr))
 
-            do ij=1,lsize ! for each grid cell
+            do ij=1,lsize ! for each roms grid cell
 
                 !--- determine depth of roms target value 
                 if (k == k_Wcurtain) then        ! 
@@ -377,19 +386,20 @@ subroutine ocpl_map_pop2roms()
                    F1 = p2x_3d_pvert_rc(k,np1)%rAttr(kFld,ij) 
                    F2 = p2x_3d_pvert_rc(k,np2)%rAttr(kFld,ij)
                    Fr = p2x_3d_rc      (k,nr )%rAttr(kFld,ij)
-                   write(o_logUnit,'(2a,5i3,2f5.2,3f5.1,3es11.3)') subName,&
-                      "<DEBUG> k,nr,ij,np1,np2,w1,w2,z1,z,z2,F1,Fr,F2=", &
-                               k,nr,ij,np1,np2,w1,w2,zp1,zr,zp2,F1,Fr,F2
+                   write(o_logUnit,'(2a,i2,i3,2i4,2i3,2f5.2,3f7.1,3es11.2)') subName,&
+                      "3d map: k,nr,i,j,np1,np2,w1,w2,z1,z,z2,F1,Fr,F2=", &
+                               k,nr,i,j,np1,np2,w1,w2,zp1,zr,zp2,F1,Fr,F2
                 end if
 
             end do ! do ij - loop over roms grid cells
          end do ! do nr ~ loop over roms layers
          end if ! lsize > 0 ~ non-zero tile size
+         write(o_logUnit,'(2a,i3,a)') subName,"3d map: k = ",k," lsize = 0 => no mapping"
       end if ! do_mapping => curtain is active
 
    end do  ! do k=1,4  ~ over all four curtains: N,E,S,W
 
-   write(o_logUnit,'(a)') subname,"Exit" ;  call shr_sys_flush(o_logUnit)
+   write(o_logUnit,'(2a)') subname,"Exit" ;  call shr_sys_flush(o_logUnit)
 
 end subroutine ocpl_map_pop2roms
 
