@@ -197,6 +197,8 @@ subroutine ocpl_roms_init()
 
    BOUNDARY_OCPL(nestID) % bypass     = .true.  ! tell roms NOT to use this data
    BOUNDARY_OCPL(nestID) % newdata    = .false. ! tell roms this data has NOT been updated
+   BOUNDARY_OCPL(nestID) % debug      = debug   ! debug level for write statements
+
    BOUNDARY_OCPL(nestID) % zeta_west  = 1.0e30
    BOUNDARY_OCPL(nestID) % zeta_east  = 1.0e30
    BOUNDARY_OCPL(nestID) % zeta_south = 1.0e30
@@ -331,7 +333,6 @@ subroutine ocpl_roms_import()
   ! put gathered data into roms internal data types 
   !-----------------------------------------------------------------------------
    BOUNDARY_OCPL(nestID) % bypass  = .false. ! tell roms     to use this data
-!  BOUNDARY_OCPL(nestID) % bypass  = .true.  ! tell roms NOT to use this data (for debugging?)
    BOUNDARY_OCPL(nestID) % newdata = .false.
    if ( do_Scurtain) then
       k = k_Ncurtain
