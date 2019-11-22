@@ -47,10 +47,10 @@ module ocpl_map_mod
 
    !--- horizontal maps (2d) ---
    type(mct_sMatp)        :: sMatp_r2o   ! maps roms -> ocn/pop
-   character(*),parameter :: r2o_mapfile = "/glade/p/cesm/cseg/mapping/makemaps/gom3_to_gx1v7_181014/map_gom3_to_gx1v7_bilin_181014.nc "
+   character(*),parameter :: r2o_mapfile = "/glade/p/cesm/cseg/mapping/makemaps/gom03_to_gx1v7_181014/map_gom03_to_gx1v7_bilin_181014.nc "
    character(*),parameter :: r2o_maptype = "Y"
    type(mct_sMatp)        :: sMatp_o2r   ! maps ocn/pop -> roms
-   character(*),parameter :: o2r_mapfile = "/glade/p/cesm/cseg/mapping/makemaps/gom3_to_gx1v7_190809/map_gx1v7_to_gom3_bilinex_190809.nc "
+   character(*),parameter :: o2r_mapfile = "/glade/p/cesm/cseg/mapping/makemaps/gom03_to_gx1v7_190809/map_gx1v7_to_gom03_bilinex_190809.nc "
    character(*),parameter :: o2r_maptype = "X"
 
 ! !PRIVATE MODULE VARIABLES
