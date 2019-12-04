@@ -66,7 +66,7 @@ module ocpl_roms_mod
    integer(IN) ::  localSize,  localISize,  localJSize   ! local tile size
    integer(IN) :: globalSize, globalISize, globalJSize   ! global nest size
 
-   integer(IN) :: debug = 1    ! debug level (higher is more)
+   integer(IN) :: debug = 0    ! debug level (higher is more)
 
 !=========================================================================================
 contains
@@ -198,6 +198,7 @@ subroutine ocpl_roms_init()
    BOUNDARY_OCPL(nestID) % bypass     = .true.  ! tell roms NOT to use this data
    BOUNDARY_OCPL(nestID) % newdata    = .false. ! tell roms this data has NOT been updated
    BOUNDARY_OCPL(nestID) % debug      = debug   ! debug level for write statements
+   BOUNDARY_OCPL(nestID) % debug      = 3       ! debug level for write statements
 
    BOUNDARY_OCPL(nestID) % zeta_west  = 1.0e30
    BOUNDARY_OCPL(nestID) % zeta_east  = 1.0e30
@@ -335,7 +336,7 @@ subroutine ocpl_roms_import()
    BOUNDARY_OCPL(nestID) % bypass  = .false. ! tell roms     to use this data
    BOUNDARY_OCPL(nestID) % newdata = .false.
    if ( do_Scurtain) then
-      k = k_Ncurtain
+      k = k_Scurtain
       do i  = 0, globalISize0(nestID) + 1   ! 0-based roms internal data
          ij = i + 1                         ! 1-based aVect 
          BOUNDARY_OCPL(nestID) % zeta_south(i) = roms2D_BC(k)%rAttr(k_p2x_2d_So_ssh ,ij) *0.01_r8
