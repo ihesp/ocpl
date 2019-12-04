@@ -295,32 +295,44 @@ subroutine ocpl_roms_import()
   ! global gather/broadcast: non-decomposed roms curtain data
   !-----------------------------------------------------------------------------
    do k = 1,4  ! for each curtain: N,E,S,W
-      call    mct_aVect_gather(p2x_2d_rc(k), roms2D_BC(k), &
-                                gsMap_rc(k), master_task, mpicom_r, stat)
-      call    mct_aVect_bcast (roms2D_BC(k), master_task, mpicom_r, stat)
+      if ((k==k_Scurtain .and. do_Scurtain==.true.) .or. &
+          (k==k_Ecurtain .and. do_Ecurtain==.true.) .or. &
+          (k==k_Ncurtain .and. do_Ncurtain==.true.) .or. &
+          (k==k_Wcurtain .and. do_Wcurtain==.true.) ) then
 
-      do n = 1,nlev_r
-         call mct_aVect_gather(p2x_3d_rc(k,n), roms3D_BC(k,n), &
-                                gsMap_rc(k)  , master_task, mpicom_r, stat)
-         call mct_aVect_bcast (roms3D_BC(k,n), master_task, mpicom_r, stat)
-      enddo
+         call    mct_aVect_gather(p2x_2d_rc(k), roms2D_BC(k), &
+                                   gsMap_rc(k), master_task, mpicom_r, stat)
+         call    mct_aVect_bcast (roms2D_BC(k), master_task, mpicom_r, stat)
+
+         do n = 1,nlev_r
+            call mct_aVect_gather(p2x_3d_rc(k,n), roms3D_BC(k,n), &
+                                   gsMap_rc(k)  , master_task, mpicom_r, stat)
+            call mct_aVect_bcast (roms3D_BC(k,n), master_task, mpicom_r, stat)
+         enddo
+      end if
    enddo
 
   !--- check values of global gather/broadcast ---
    if (debug>0 ) then
       do k = 1,4  ! for each curtain: N,E,S,W
-         kfld = mct_aVect_indexRA(roms2D_BC(k),"So_ssh" )
-         tmin = minval( roms2D_BC(k)%rAttr(kfld,:) )
-         tmax = maxval( roms2D_BC(k)%rAttr(kfld,:) )
-         write(o_logUnit,'(2a,i2,2es11.3)') subname,"global k, ssh   min,max = ",k,tmin,tmax 
+         if ((k==k_Scurtain .and. do_Scurtain==.true.) .or. &
+             (k==k_Ecurtain .and. do_Ecurtain==.true.) .or. &
+             (k==k_Ncurtain .and. do_Ncurtain==.true.) .or. &
+             (k==k_Wcurtain .and. do_Wcurtain==.true.) ) then
 
-         kfld = mct_aVect_indexRA(roms3D_BC(k,1),"So_temp" )
-         tmin = minval( roms3D_BC(k,1)%rAttr(kfld,:) )
-         tmax = maxval( roms3D_BC(k,1)%rAttr(kfld,:) )
-         write(o_logUnit,'(2a,i2,2es11.3)') subname,"global k, T bot min,max = ",k,tmin,tmax 
-         tmin = minval( roms3D_BC(k,nlev_r)%rAttr(kfld,:) )
-         tmax = maxval( roms3D_BC(k,nlev_r)%rAttr(kfld,:) )
-         write(o_logUnit,'(2a,i2,2es11.3)') subname,"global k, T top min,max = ",k,tmin,tmax 
+            kfld = mct_aVect_indexRA(roms2D_BC(k),"So_ssh" )
+            tmin = minval( roms2D_BC(k)%rAttr(kfld,:) )
+            tmax = maxval( roms2D_BC(k)%rAttr(kfld,:) )
+            write(o_logUnit,'(2a,i2,2es11.3)') subname,"global k, ssh   min,max = ",k,tmin,tmax 
+
+            kfld = mct_aVect_indexRA(roms3D_BC(k,1),"So_temp" )
+            tmin = minval( roms3D_BC(k,1)%rAttr(kfld,:) )
+            tmax = maxval( roms3D_BC(k,1)%rAttr(kfld,:) )
+            write(o_logUnit,'(2a,i2,2es11.3)') subname,"global k, T bot min,max = ",k,tmin,tmax 
+            tmin = minval( roms3D_BC(k,nlev_r)%rAttr(kfld,:) )
+            tmax = maxval( roms3D_BC(k,nlev_r)%rAttr(kfld,:) )
+            write(o_logUnit,'(2a,i2,2es11.3)') subname,"global k, T top min,max = ",k,tmin,tmax 
+         end if
       end do
    end if
 
