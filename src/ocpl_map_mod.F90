@@ -377,7 +377,7 @@ subroutine ocpl_map_pop2roms()
                        w2 * p2x_3d_pvert_rc(k,np2)%rAttr(:,ij) 
 
                 !--- document a sampling of interp specifics ---
-                if (debug>0 .and. ((nr==nlev_r .or. mod(nr-1,10)==0) &
+                if (debug>1 .and. ((nr==nlev_r .or. mod(nr-1,10)==0) &
                             .and.  (ij==lsize  .or. mod(ij-1,10)==0))  ) then
                    zp1 = depth_p(np1) 
                    zp2 = depth_p(np2) 
