@@ -198,7 +198,6 @@ subroutine ocpl_roms_init()
    BOUNDARY_OCPL(nestID) % bypass     = .true.  ! tell roms NOT to use this data
    BOUNDARY_OCPL(nestID) % newdata    = .false. ! tell roms this data has NOT been updated
    BOUNDARY_OCPL(nestID) % debug      = debug   ! debug level for write statements
-   BOUNDARY_OCPL(nestID) % debug      = 3       ! debug level for write statements
 
    BOUNDARY_OCPL(nestID) % zeta_west  = 1.0e30
    BOUNDARY_OCPL(nestID) % zeta_east  = 1.0e30
