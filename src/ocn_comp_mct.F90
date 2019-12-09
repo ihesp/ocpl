@@ -39,7 +39,8 @@ module ocn_comp_mct
 
    use shr_file_mod 
    use shr_cal_mod,       only : shr_cal_date2ymd
-   use shr_sys_mod
+   use shr_sys_mod,       only : shr_sys_flush
+   use shr_mpi_mod,       only : shr_mpi_bcast
    use shr_kind_mod, only: IN=>SHR_KIND_IN, R8=>SHR_KIND_R8, CS=>SHR_KIND_CS, CL=>SHR_KIND_CL
 
    use ocpl_data_mod
@@ -59,15 +60,10 @@ module ocn_comp_mct
 
 ! ! PUBLIC DATA:
 
-   integer(IN) ::  shrlogunit,shrloglev   ! to save & restore shared log units & levels
+! ! PRIVATE DATA:
 
-   integer (IN), private :: cpl_write_restart  ! flag id for write restart
-   integer (IN), private :: cpl_write_history  ! flag id for write history
-   integer (IN), private :: cpl_write_tavg     ! flag id for write tavg      
-   integer (IN), private :: cpl_diag_global    ! flag id for computing diagnostics
-   integer (IN), private :: cpl_diag_transp    ! flag id for computing diagnostics
-
-   integer (IN)  :: nsend, nrecv
+   integer(IN) :: shrlogunit,shrloglev  ! to save & restore shared log units & levels
+   integer(IN) :: debug = 0             ! debug level
 
 !=========================================================================================
 contains
@@ -132,18 +128,24 @@ contains
       call shr_file_setIO("ocn_modelio.nml",o_logUnit)  ! assign ocpl logUnit to a named file
       call shr_file_setLogUnit (o_logunit)  ! set shared logUnit = ocpl's logUnit
       call shr_file_setLogLevel(1)
+      d_logunit = o_logUnit                 ! where debug info goes
    else
       o_logUnit = shrlogunit ! wherever cpl was using for non-root logunit, presumably cesm.log.*
+      d_logunit = o_logUnit  ! where debug info goes
+      if (debug==0) then     ! send o_logunit to /dev/null
+         d_logunit = shr_file_getUnit() ! get/reserve unused unit number
+         open(d_logunit,file="/dev/null",status='replace',action='write')
+      endif
    endif
    pop_logUnit  = o_logUnit              ! set pop    logUnit = ocpl's logUnit
    roms_logUnit = o_logUnit              ! set roms   logUnit = ocpl's logUnit
 
-   write(o_logUnit,F00) " ENTER"
+   write(o_logunit,F00) " ENTER"
    ncomp = OCNID(1)
-   write(o_logUnit,*) subName,"comp  ID = ",                ncomp
-   write(o_logUnit,*) subName,"comp PID = ",seq_comm_iam   (ncomp)
-   write(o_logUnit,*) subName,"glob PID = ",seq_comm_gloiam(ncomp)
-   write(o_logUnit,*) subName,"logUnit  = ",o_logUnit
+   write(o_logunit,*) subName,"comp  ID = ",                ncomp
+   write(o_logunit,*) subName,"comp PID = ",seq_comm_iam   (ncomp)
+   write(o_logunit,*) subName,"glob PID = ",seq_comm_gloiam(ncomp)
+   write(o_logunit,*) subName,"logUnit  = ",o_logUnit
 
    !--- Get data/pointers out of cdata ---
    call seq_cdata_setptrs(cdata_o, ID=OCNID_o, dom=dom_o, gsMap=gsMap_o, infodata=infodata_o, mpicom=mpicom_o,name=name_o)
@@ -194,7 +196,7 @@ contains
    write(o_logunit,'(2a,2i6)') subname,'<DEBUG> r2x_o lsize, nflds = ',mct_aVect_lsize(r2x_o),mct_aVect_nRAttr(r2x_o)
 
    !--------------------------------------------------------------------------------------
-   ! init additional data-types needed for ocpl's 3D global/regional ocean coupling 
+   ! init additional data-types needed for ocpl's 3d global/regional ocean coupling 
    !--------------------------------------------------------------------------------------
    
    write(o_logunit,F01) "call ocpl_pop_init"  ; call shr_sys_flush(o_logunit)
@@ -218,7 +220,7 @@ contains
    write(o_logunit,*) subName, 'ni_r,nj_r      : ' ,  ni_r,nj_r
 
    !--------------------------------------------------------------------------------------
-   ! initi surface & 3d maps (bk: move to ocpl_map_mod.F90 ?)
+   ! init surface & 3d maps (bk: move to ocpl_map_mod.F90 ?)
    !--------------------------------------------------------------------------------------
    write(o_logunit,*) subName, "initialize r2o map..."
    call shr_mct_sMatPInitnc(sMatp_r2o,gsMap_r,gsMap_o, trim(r2o_mapfile),trim(r2o_maptype),mpicom_o)
@@ -229,18 +231,21 @@ contains
    write(o_logunit,*) subName, "initialize 3d maps..."
    call ocpl_map_init()
 
-   write(o_logunit,*) subName, "done initializing maps"
 
-   !--------------------------------------------------------------------------------------
-   ! merge roms & pop IC output
-   !--------------------------------------------------------------------------------------
-   write(o_logunit,*) subname,"map: r2x_r -> r2x_o"
+   !----------------------------------------------------------------------------
+   ! merge roms output into pop output (coupler will receive this merged data)
+   !----------------------------------------------------------------------------
+   write(o_logunit,*) subname,"map: r2x_r -> r2x_o & merge roms & pop output"
    call mct_sMat_avMult(r2x_r, sMatp_r2o, r2x_o,vector=usevector)
-   write(o_logunit,*) subname,' merge roms & pop output'
+
+   if (debug > 0) then
+      k = mct_avect_indexra(o2x_o,'So_t')
+      write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max r2x_r SST = ',minval(r2x_r%rAttr(k,:)),maxval(r2x_r%rAttr(k,:))
+      write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max r2x_o SST = ',minval(r2x_o%rAttr(k,:)),maxval(r2x_o%rAttr(k,:))
+      write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max o2x_o SST = ',minval(o2x_o%rAttr(k,:)),maxval(o2x_o%rAttr(k,:))
+   end if
+
    k = mct_avect_indexra(o2x_o,'So_t')
-   write(o_logunit,'(2a,2i6)'   ) subname,'<DEBUG> So_t index = ',k
-   write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max o2x_o SST0= ',minval(o2x_o%rAttr(k,:)),maxval(o2x_o%rAttr(k,:))
-   write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max o2x_o SST0= ',minval(o2x_o%rAttr(k,:)),maxval(o2x_o%rAttr(k,:))
    lsize_o = mct_aVect_lsize( o2x_o )
    do n=1,lsize_o
       if (r2x_o%rAttr(k,n) > 1.0) then  ! has data mapped from roms (unmapped cells have sst = 0)
@@ -248,12 +253,11 @@ contains
       !   o2x_o%rAttr(k,n) = r2x_o%rAttr(k,n)  ! merge SST only
       end if
    end do
-   write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max r2x_r SST = ',minval(r2x_r%rAttr(k,:)),maxval(r2x_r%rAttr(k,:))
-   write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max r2x_o SST = ',minval(r2x_o%rAttr(k,:)),maxval(r2x_o%rAttr(k,:))
-   write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max o2x_o SST = ',minval(o2x_o%rAttr(k,:)),maxval(o2x_o%rAttr(k,:))
-   write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max r2x_r SST = ',minval(r2x_r%rAttr(k,:)),maxval(r2x_r%rAttr(k,:))
-   write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max r2x_o SST = ',minval(r2x_o%rAttr(k,:)),maxval(r2x_o%rAttr(k,:))
-   write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max o2x_o SST = ',minval(o2x_o%rAttr(k,:)),maxval(o2x_o%rAttr(k,:))
+
+   if (debug > 0 ) then
+      k = mct_avect_indexra(o2x_o,'So_t')
+      write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max o2x_o SST+ = ',minval(o2x_o%rAttr(k,:)),maxval(o2x_o%rAttr(k,:))
+   end if
 
 
    write(o_logunit,F00) "EXIT" ; call shr_sys_flush(o_logunit)
@@ -327,24 +331,45 @@ contains
    write(o_logunit,*) subname,'cpl target model date: ymd, tod =',ymd,tod
 
    !----------------------------------------------------------------------------
+   ! export data from roms (for pop 3d restoring)
+   !----------------------------------------------------------------------------
+!  write(o_logunit,F01) "export ocean coupling fields from roms (pop 3d restoring)" ; call shr_sys_flush(o_logunit)
+!  call ocpl_roms_export( )
+
+   !----------------------------------------------------------------------------
+   ! map: pop -> roms  (pop 3d restoring)
+   !----------------------------------------------------------------------------
+!  write(o_logunit,F01) "map: roms->pop (pop 3d restoring)" ; call shr_sys_flush(o_logunit)
+!  call ocpl_map_roms2pop()
+
+   !----------------------------------------------------------------------------
+   ! import data into pop (pop 3d restoring)
+   !----------------------------------------------------------------------------
+!  write(o_logunit,F01) "import ocean coupling fields into pop (3d restoring)" ; call shr_sys_flush(o_logunit)
+!  call ocpl_pop_import( )
+
+   !----------------------------------------------------------------------------
    ! run pop
    !----------------------------------------------------------------------------
    write(o_logunit,F01) "call pop_run_mct"
    call pop_run_mct( EClock, cdata_o, x2o_o, o2x_o)
 
    !----------------------------------------------------------------------------
-   write(o_logunit,F01) "export ocean coupling fields from pop (roms lateral BCs)" ; call shr_sys_flush(o_logunit)
+   ! export data from pop (roms lateral BCs)
    !----------------------------------------------------------------------------
+   write(o_logunit,F01) "export ocean coupling fields from pop (roms lateral BCs)" ; call shr_sys_flush(o_logunit)
    call ocpl_pop_export( p2x_2d_p, p2x_3d_p)
 
    !----------------------------------------------------------------------------
-   write(o_logunit,F01) "map: pop->roms (roms lateral BCs)" ; call shr_sys_flush(o_logunit)
+   ! map: pop -> roms  (roms lateral BCs)
    !----------------------------------------------------------------------------
+   write(o_logunit,F01) "map: pop->roms (roms lateral BCs)" ; call shr_sys_flush(o_logunit)
    call ocpl_map_pop2roms()
 
    !----------------------------------------------------------------------------
-   write(o_logunit,F01) "import ocean coupling fields into roms (roms lateral BCs)" ; call shr_sys_flush(o_logunit)
+   ! import data to roms (roms lateral BCs)
    !----------------------------------------------------------------------------
+   write(o_logunit,F01) "import ocean coupling fields into roms (lateral BCs)" ; call shr_sys_flush(o_logunit)
    call ocpl_roms_import( )
 
    !----------------------------------------------------------------------------
@@ -352,26 +377,31 @@ contains
    !----------------------------------------------------------------------------
    write(o_logunit,*) subname,"map: x2o_o -> x2o_r"
    call mct_sMat_avMult(x2o_o, sMatp_o2r, x2o_r,vector=usevector)
-   k = mct_avect_indexra(x2o_o,'Foxx_lwup')
-   write(o_logunit,'(2a,2i6)'   ) subname,'<DEBUG> Foxx_lwup index = ',k
-   write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max x2o_o Foxx_lwup= ',minval(x2o_o%rAttr(k,:)),maxval(x2o_o%rAttr(k,:))
-   write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max x2o_r Foxx_lwup= ',minval(x2o_r%rAttr(k,:)),maxval(x2o_r%rAttr(k,:))
-   write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max x2o_o Foxx_lwup= ',minval(x2o_o%rAttr(k,:)),maxval(x2o_o%rAttr(k,:))
-   write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max x2o_r Foxx_lwup= ',minval(x2o_r%rAttr(k,:)),maxval(x2o_r%rAttr(k,:))
+
+   if (debug > 0) then
+      k = mct_avect_indexra(x2o_o,'Foxx_lwup')
+      write(o_logunit,'(2a,2i6)'   ) subname,'<DEBUG> Foxx_lwup index = ',k
+      write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max x2o_o Foxx_lwup= ',minval(x2o_o%rAttr(k,:)),maxval(x2o_o%rAttr(k,:))
+      write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max x2o_r Foxx_lwup= ',minval(x2o_r%rAttr(k,:)),maxval(x2o_r%rAttr(k,:))
+   end if
 
    write(o_logunit,F01) "call roms_run_mct"
    call roms_run_mct( EClock, cdata_r, x2o_r, r2x_r)
 
    !----------------------------------------------------------------------------
-   ! merge roms output into pop output
+   ! merge roms output into pop output (coupler will receive this merged data)
    !----------------------------------------------------------------------------
-   write(o_logunit,*) subname,"map: r2x_r -> r2x_o"
+   write(o_logunit,*) subname,"map: r2x_r -> r2x_o & merge roms & pop output"
    call mct_sMat_avMult(r2x_r, sMatp_r2o, r2x_o,vector=usevector)
-   write(o_logunit,*) subname,' merge roms & pop output'
+
+   if (debug > 0) then
+      k = mct_avect_indexra(o2x_o,'So_t')
+      write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max r2x_r SST = ',minval(r2x_r%rAttr(k,:)),maxval(r2x_r%rAttr(k,:))
+      write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max r2x_o SST = ',minval(r2x_o%rAttr(k,:)),maxval(r2x_o%rAttr(k,:))
+      write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max o2x_o SST = ',minval(o2x_o%rAttr(k,:)),maxval(o2x_o%rAttr(k,:))
+   end if
+
    k = mct_avect_indexra(o2x_o,'So_t')
-   write(o_logunit,'(2a,2i6)'   ) subname,'<DEBUG> So_t index = ',k
-   write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max o2x_o SST0= ',minval(o2x_o%rAttr(k,:)),maxval(o2x_o%rAttr(k,:))
-   write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max o2x_o SST0= ',minval(o2x_o%rAttr(k,:)),maxval(o2x_o%rAttr(k,:))
    lsize_o = mct_aVect_lsize( o2x_o )
    do n=1,lsize_o
       if (r2x_o%rAttr(k,n) > 1.0) then  ! has data mapped from roms (unmapped cells have sst = 0)
@@ -379,12 +409,11 @@ contains
       !   o2x_o%rAttr(k,n) = r2x_o%rAttr(k,n)  ! merge SST only
       end if
    end do
-   write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max r2x_r SST = ',minval(r2x_r%rAttr(k,:)),maxval(r2x_r%rAttr(k,:))
-   write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max r2x_o SST = ',minval(r2x_o%rAttr(k,:)),maxval(r2x_o%rAttr(k,:))
-   write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max o2x_o SST = ',minval(o2x_o%rAttr(k,:)),maxval(o2x_o%rAttr(k,:))
-   write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max r2x_r SST = ',minval(r2x_r%rAttr(k,:)),maxval(r2x_r%rAttr(k,:))
-   write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max r2x_o SST = ',minval(r2x_o%rAttr(k,:)),maxval(r2x_o%rAttr(k,:))
-   write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max o2x_o SST = ',minval(o2x_o%rAttr(k,:)),maxval(o2x_o%rAttr(k,:))
+
+   if (debug > 0 ) then
+      k = mct_avect_indexra(o2x_o,'So_t')
+      write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max o2x_o SST+ = ',minval(o2x_o%rAttr(k,:)),maxval(o2x_o%rAttr(k,:))
+   end if
 
 !  call timer_stop(timer_total)
 
@@ -439,19 +468,17 @@ subroutine ocn_final_mct( EClock, cdata_o, x2o_o, o2x_o)
 !
 !-----------------------------------------------------------------------
 
-
    !--- set shr logging to ocpl's unit ---
    call shr_file_getLogUnit (shrlogunit) ! save log unit
    call shr_file_getLogLevel(shrloglev)  ! save log level
-   call shr_file_setLogUnit (o_logunit)     ! set shared log unit to ocpl's logUnit
+   call shr_file_setLogUnit (o_logunit)  ! set shared log unit to ocpl's logUnit
    write(o_logunit,F00) "ENTER" ; call shr_sys_flush(o_logunit)
 
    write(o_logunit,F01) "pop_final_mct call" ; call shr_sys_flush(o_logunit)
    call pop_final_mct( EClock, cdata_o, x2o_o, o2x_o)
-   write(o_logunit,F01) "pop_final_mct return" ; call shr_sys_flush(o_logunit)
+
    write(o_logunit,F01) "roms_final_mct call" ; call shr_sys_flush(o_logunit)
    call roms_final_mct( EClock, cdata_r, x2o_r, r2x_r)
-   write(o_logunit,F01) "roms_final_mct return" ; call shr_sys_flush(o_logunit)
 
    write(o_logunit,F00) "EXIT" ; call shr_sys_flush(o_logunit)
 

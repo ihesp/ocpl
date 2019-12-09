@@ -26,9 +26,10 @@ module ocpl_data_mod
 
 !  PUBLIC DATA:
 
-   character(CL)   :: start_type
-   character(CS)   :: case_name
-   integer(IN)     :: o_logUnit = 6
+   character(CL) :: start_type
+   character(CS) :: case_name
+   integer(IN)   :: o_logUnit = 6 ! ocn   unit normally ocn.log
+   integer(IN)   :: d_logUnit = 6 ! debug unit, ocn.log for PID==0, else stdout or /dev/nul 
 
    !--------------------------------------------------------------------------------------
    ! "_o" data -- ocean domain coupler interacts with, TENTITIVELY is the pop domain
