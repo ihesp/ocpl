@@ -302,12 +302,16 @@ subroutine ocpl_roms_import()
 
          call    mct_aVect_gather(p2x_2d_rc(k), roms2D_BC(k), &
                                    gsMap_rc(k), master_task, mpicom_r, stat)
+         if (stat/=0) write(o_logunit,*) subName,"ERROR: mct_aVect_gather 2d, stat = ",stat
          call    mct_aVect_bcast (roms2D_BC(k), master_task, mpicom_r, stat)
+         if (stat/=0) write(o_logunit,*) subName,"ERROR: mct_aVect_bcast 2d, stat = ",stat
 
          do n = 1,nlev_r
             call mct_aVect_gather(p2x_3d_rc(k,n), roms3D_BC(k,n), &
                                    gsMap_rc(k)  , master_task, mpicom_r, stat)
+            if (stat/=0) write(o_logunit,*) subName,"ERROR: mct_aVect_gather 3d, stat = ",stat
             call mct_aVect_bcast (roms3D_BC(k,n), master_task, mpicom_r, stat)
+            if (stat/=0) write(o_logunit,*) subName,"ERROR: mct_aVect_bcast 3d, stat = ",stat
          enddo
       end if
    enddo
@@ -409,6 +413,22 @@ subroutine ocpl_roms_import()
       end do
       BOUNDARY_OCPL(nestID) % newdata    = .true.
    end if
+
+   !--------------------------------------------------------------------------------------
+   ! dealloc global aVect datatypes (mct_aVect_gather & bcast re-allocs every time ?)
+   !--------------------------------------------------------------------------------------
+   do k = 1,4  ! for each curtain: N,E,S,W
+      if ((k==k_Scurtain .and. do_Scurtain==.true.) .or. &
+          (k==k_Ecurtain .and. do_Ecurtain==.true.) .or. &
+          (k==k_Ncurtain .and. do_Ncurtain==.true.) .or. &
+          (k==k_Wcurtain .and. do_Wcurtain==.true.) ) then
+
+         call mct_aVect_clean(roms2d_BC(k))
+         do n = 1,nlev_r
+            call mct_aVect_clean(roms3d_BC(k,n))
+         enddo
+      end if
+   enddo
 
    write(o_logunit,'(2a)') subname,"Exit" ;  call shr_sys_flush(o_logunit)
 
