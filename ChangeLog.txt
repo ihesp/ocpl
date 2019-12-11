@@ -1,4 +1,13 @@
 ================================================================================
+Tag name: master_191211
+Originator(s): kauff
+Date: 2019 Dec 11
+One-line Summary: verified to work on cheyenne for 1 year run
+
+various bug fixes and enhancements relative to master_191122
+verified to work on cheyenne for 1 year run
+
+================================================================================
 Tag name: master_191122
 Originator(s): kauff
 Date: 2019 Nov 22
@@ -9,7 +18,6 @@ ocpl_map_pop2roms -- 3d mapping from pop grid to roms BC grid
 ocpl_roms_import -- sets BC data in roms internal data structures 
                     new data structures created for this purpose
 
-================================================================================
 ================================================================================
 Tag name: master_190815
 Originator(s): kauff
