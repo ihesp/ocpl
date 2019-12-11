@@ -220,17 +220,10 @@ contains
    write(o_logunit,*) subName, 'ni_r,nj_r      : ' ,  ni_r,nj_r
 
    !--------------------------------------------------------------------------------------
-   ! init surface & 3d maps (bk: move to ocpl_map_mod.F90 ?)
+   ! init all maps (surface, 3d, curtain)
    !--------------------------------------------------------------------------------------
-   write(o_logunit,*) subName, "initialize r2o map..."
-   call shr_mct_sMatPInitnc(sMatp_r2o,gsMap_r,gsMap_o, trim(r2o_mapfile),trim(r2o_maptype),mpicom_o)
-
-   write(o_logunit,*) subName, "initialize o2r map..."
-   call shr_mct_sMatPInitnc(sMatp_o2r,gsMap_o,gsMap_r, trim(o2r_mapfile),trim(o2r_maptype),mpicom_o)
-
-   write(o_logunit,*) subName, "initialize 3d maps..."
+   write(o_logunit,*) subName, "initialize all maps..."
    call ocpl_map_init()
-
 
    !----------------------------------------------------------------------------
    ! merge roms output into pop output (coupler will receive this merged data)
