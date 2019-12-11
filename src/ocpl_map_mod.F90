@@ -47,18 +47,13 @@ module ocpl_map_mod
 
    !--- horizontal maps (2d) ---
    type(mct_sMatp)        :: sMatp_r2o   ! maps roms -> ocn/pop
-   character(*),parameter :: r2o_mapfile = "/glade/p/cesm/cseg/mapping/makemaps/gom03_to_gx1v7_181014/map_gom03_to_gx1v7_bilin_181014.nc "
-   character(*),parameter :: r2o_maptype = "Y"
    type(mct_sMatp)        :: sMatp_o2r   ! maps ocn/pop -> roms
-   character(*),parameter :: o2r_mapfile = "/glade/p/cesm/cseg/mapping/makemaps/gom03_to_gx1v7_190809/map_gx1v7_to_gom03_bilinex_190809.nc "
-   character(*),parameter :: o2r_maptype = "X"
 
 ! !PRIVATE MODULE VARIABLES
 
    integer,parameter,private :: debug = 1   ! debug level
 
-   !--- pop -> roms curtain maps ---
-
+   !--- curtain maps: pop -> roms ---
    type(mct_sMatp) :: sMatp_p2rc(4)  ! 4-curtains: S,E,N,W
 
 !=========================================================================================
@@ -100,11 +95,19 @@ subroutine ocpl_map_init()
 !-----------------------------------------------------------------------------------------
 
    write(o_logUnit,'(2a)') subname,"Enter" ;  call shr_sys_flush(o_logUnit)
-   if (debug>0) write(o_logUnit,'(2a,i2)') subname,"debug level = ",debug
+   write(o_logUnit,'(2a,i2)') subname,"debug level = ",debug
 
    !--------------------------------------------------------------------------------------
-   write(o_logUnit,*) subname,"Init pop->roms curtain maps"
+   write(o_logUnit,*) subname,"Init pop<->roms surface and curtain maps"
    !--------------------------------------------------------------------------------------
+
+   call shr_mct_queryConfigFile(mpicom_o,configFile,"roms2pop_file:",mapfile,"roms2pop_type:",maptype)
+   write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
+   call shr_mct_sMatPInitnc(sMatp_r2o,gsMap_r,gsMap_o,trim(mapfile),trim(maptype),mpicom_o)
+
+   call shr_mct_queryConfigFile(mpicom_o,configFile,"pop2roms_file:",mapfile,"pop2roms_type:",maptype)
+   write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
+   call shr_mct_sMatPInitnc(sMatp_o2r,gsMap_o,gsMap_r,trim(mapfile),trim(maptype),mpicom_o)
 
    if (do_Scurtain) then
       k = k_Scurtain
