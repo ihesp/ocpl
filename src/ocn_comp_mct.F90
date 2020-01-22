@@ -326,8 +326,8 @@ contains
    !----------------------------------------------------------------------------
    ! export data from roms (for pop 3d restoring)
    !----------------------------------------------------------------------------
-!  write(o_logunit,F01) "export ocean coupling fields from roms (pop 3d restoring)" ; call shr_sys_flush(o_logunit)
-!  call ocpl_roms_export( )
+   write(o_logunit,F01) "export ocean coupling fields from roms (pop 3d restoring)" ; call shr_sys_flush(o_logunit)
+   call ocpl_roms_export( )
 
    !----------------------------------------------------------------------------
    ! map: pop -> roms  (pop 3d restoring)

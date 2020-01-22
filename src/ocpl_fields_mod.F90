@@ -39,8 +39,8 @@ module ocpl_fields_mod
 
    ! States
    character(*), parameter :: ocpl_r2x_3d_states = &
-          'T'          &    ! temperature from ROMS           DEF
-      // ':S'               ! salinity    from ROMS           DEF
+          'So_temp'    &    ! temperature from ROMS           DEF
+      // ':So_salt'         ! salinity    from ROMS           DEF
 
    ! Fluxes
    character(*), parameter :: ocpl_r2x_3d_fluxes = &
@@ -88,6 +88,9 @@ module ocpl_fields_mod
    integer(IN) :: k_p2x_3d_So_salt
    integer(IN) :: k_p2x_3d_So_uvel
    integer(IN) :: k_p2x_3d_So_vvel
+
+   integer(IN) :: k_r2x_3d_So_temp
+   integer(IN) :: k_r2x_3d_So_salt
 
    save ! save everything
 

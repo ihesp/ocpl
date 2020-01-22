@@ -46,7 +46,7 @@ module ocpl_roms_mod
 ! !PUBLIC MEMBER FUNCTIONS:
 
    public :: ocpl_roms_init
-!  public :: ocpl_roms_export
+   public :: ocpl_roms_export
    public :: ocpl_roms_import
 
 
@@ -101,7 +101,7 @@ subroutine ocpl_roms_init()
    integer, external :: omp_get_max_threads  ! max number of threads that can execute
 #endif
 
-   integer(IN)  :: lSize,m,k
+   integer(IN)  :: lSize,k,m,n
 
    character(*),parameter :: subName =   "(ocpl_roms_init) "
    character(*),parameter :: F03     = '("(ocpl_roms_init) ",a,2es11.3)'
@@ -229,9 +229,104 @@ subroutine ocpl_roms_init()
    BOUNDARY_OCPL(nestID) % salt_north = 1.0e30
    BOUNDARY_OCPL(nestID) % newdata    = .false.
 
+   !--------------------------------------------------------------------------------------
+   write(o_logunit,*) subName,"init 3d export aVects" ; call shr_sys_flush(o_logunit)
+   !--------------------------------------------------------------------------------------
+   lsize = mct_gsMap_lsize(gsMap_r, mpicom_r)
+
+   allocate(r2x_3d_r(nlev_r))
+   do n=1,nlev_r
+      call mct_aVect_init(r2x_3d_r(n), rList=ocpl_r2x_3d_fields, lsize=lsize)
+      call mct_aVect_zero(r2x_3d_r(n))
+   end do
+
+   k_r2x_3d_So_temp = mct_aVect_indexRA(r2x_3d_r(1),"So_temp" )
+   k_r2x_3d_So_salt = mct_aVect_indexRA(r2x_3d_r(1),"So_salt" )
+
    write(o_logunit,'(2a)') subname,"Exit" ;  call shr_sys_flush(o_logunit)
 
 end subroutine ocpl_roms_init
+
+!=========================================================================================
+!BOP !====================================================================================
+!
+! !IROUTINE: ocpl_roms_export
+!
+! !DESCRIPTION:
+!    put lateral BCs into roms
+!
+! !INTERFACE:
+!
+! !REVISION HISTORY:
+!    2020 Jan -- Brian Kauffman, initial version
+!
+! !INTERFACE: ----------------------------------------------------------------------------
+
+subroutine ocpl_roms_export()
+
+! !INPUT/OUTPUT PARAMETERS:
+
+   use mod_stepping, only : nrhs,nnew
+   use mod_param   , only : BOUNDS
+   use mod_ocean   , only : OCEAN
+   use mod_parallel, only : ocn_tile => MyRank
+   use mod_scalars , only : isalt, itemp
+
+   use shr_const_mod, only : SHR_CONST_TKFRZ
+
+
+!EOP
+!BOC
+
+   integer(IN) :: ids, ide, jds, jde ! local tile index bounds
+   integer(IN) :: i,j                ! index for 3d array of horizonal grid cells
+   integer(IN) :: n                  ! index for vector of horizonal grid cells
+   integer(IN) :: k                  ! index for vertical level
+   real(R8)    :: tmin,tmax          ! min/max value of field for debugging
+
+   character(*), parameter :: subName = "(ocpl_roms_export) "
+
+!-----------------------------------------------------------------------------------------
+!
+!-----------------------------------------------------------------------------------------
+
+   if (debug>1) write(o_logunit,'(a)') "Enter" ;  call shr_sys_flush(o_logunit)
+
+   ids = BOUNDS(nestID)%IstrR(ocn_tile)
+   ide = BOUNDS(nestID)%IendR(ocn_tile)
+   jds = BOUNDS(nestID)%JstrR(ocn_tile)
+   jde = BOUNDS(nestID)%JendR(ocn_tile)
+
+   do k = 1,nlev_r
+      n=0
+      do j=jds,jde
+      do i=ids,ide    
+         n=n+1
+         r2x_3d_r(k) % rAttr(k_r2x_3d_So_temp,n) = OCEAN(nestID) % t(i,j,k,nnew(nestID),itemp) + SHR_CONST_TKFRZ
+         r2x_3d_r(k) % rAttr(k_r2x_3d_So_salt,n) = OCEAN(nestID) % t(i,j,k,nnew(nestID),isalt) * 0.001_r8
+      end do
+      end do
+   end do
+
+   if (debug>2) then
+      k = nlev_r
+         write(o_logUnit,*) subname,"DEBUG> nestID,tile,t-indx  = ",nestID,ocn_tile,nnew(nestID)
+         write(o_logUnit,*) subname,"DEBUG> jds,jed,ids,ide= ",jds,jde,ids,ide
+         write(o_logUnit,*) subname,"DEBUG> k_temp,k_salt  = ",k_r2x_3d_So_salt,k_r2x_3d_So_temp
+         write(o_logUnit,*) subname,"DEBUG> itemp , isalt  = ",itemp , isalt
+      tmin = minval( r2x_3d_r(k)%rAttr(k_r2x_3d_So_temp,:) )
+      tmax = maxval( r2x_3d_r(k)%rAttr(k_r2x_3d_So_temp,:) )
+      write(o_logUnit,'(2a,i2,2es11.3)') subname,"layer, local T min,max = ",k,tmin,tmax 
+      k = 5
+      tmin = minval( r2x_3d_r(k)%rAttr(k_r2x_3d_So_temp,:) )
+      tmax = maxval( r2x_3d_r(k)%rAttr(k_r2x_3d_So_temp,:) )
+      write(o_logUnit,'(2a,i2,2es11.3)') subname,"layer, local T min,max = ",k,tmin,tmax 
+      tmin = minval( r2x_3d_r(k)%rAttr(k_r2x_3d_So_salt,:) )
+      tmax = maxval( r2x_3d_r(k)%rAttr(k_r2x_3d_So_salt,:) )
+      write(o_logUnit,'(2a,i2,2es11.3)') subname,"layer, local S min,max = ",k,tmin,tmax 
+   end if
+
+end subroutine ocpl_roms_export
 
 !=========================================================================================
 !BOP !====================================================================================
