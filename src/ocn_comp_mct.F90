@@ -306,13 +306,7 @@ contains
     endif
 #endif
 
-!-----------------------------------------------------------------------
-!
-!  start up the main timer
-!
-!-----------------------------------------------------------------------
-
-!  call timer_start(timer_total)
+   !  call timer_start(timer_total) ! start up the main timer
 
    !--- reset shr logging to my log file ---
    call shr_file_getLogUnit (shrlogunit) ! save log unit
@@ -326,14 +320,14 @@ contains
    !----------------------------------------------------------------------------
    ! export data from roms (for pop 3d restoring)
    !----------------------------------------------------------------------------
-   write(o_logunit,F01) "export ocean coupling fields from roms (pop 3d restoring)" ; call shr_sys_flush(o_logunit)
+   write(o_logunit,F01) "export 3d fields from roms (for pop 3d restoring)" ; call shr_sys_flush(o_logunit)
    call ocpl_roms_export( )
 
    !----------------------------------------------------------------------------
    ! map: pop -> roms  (pop 3d restoring)
    !----------------------------------------------------------------------------
-!  write(o_logunit,F01) "map: roms->pop (pop 3d restoring)" ; call shr_sys_flush(o_logunit)
-!  call ocpl_map_roms2pop()
+   write(o_logunit,F01) "map: roms->pop (for pop 3d restoring)" ; call shr_sys_flush(o_logunit)
+   call ocpl_map_roms2pop()
 
    !----------------------------------------------------------------------------
    ! import data into pop (pop 3d restoring)

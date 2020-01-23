@@ -65,7 +65,7 @@ module ocpl_data_mod
 
    !--- roms & pop: number of vertical levels ---
    integer(IN)             :: nlev_p         ! pop : number of vertical levels
-   integer(IN)             :: nlev_pr        ! pop : number of vertical levels to be restored
+   integer(IN),parameter   :: nlev_rp = 34   ! number of pop restoring levels (34=> 527m)
    integer(IN)             :: nlev_r         ! roms: number of levels 
 
    !--- fundamental cesm coupler & mct data structures ---

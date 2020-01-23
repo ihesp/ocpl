@@ -31,16 +31,11 @@ module ocpl_fields_mod
    ! exchange fields: roms-> pop
    !----------------------------------------------------------------------------
    ! States
-   character(*), parameter :: ocpl_fields_r2x_states = &
-         'So_t_roms'   &    ! temperature from ROMS           DEF
+   character(*), parameter :: ocpl_r2x_3d_states = &
+         'So_temp'     &    ! temperature from ROMS           DEF
+      //':So_salt'     &    ! salinity    from ROMS           DEF
       //':reslev'      &    ! max restoring level in pop      DEF
       //':wgts'             ! weights for merging ROMS fields DEF
-
-
-   ! States
-   character(*), parameter :: ocpl_r2x_3d_states = &
-          'So_temp'    &    ! temperature from ROMS           DEF
-      // ':So_salt'         ! salinity    from ROMS           DEF
 
    ! Fluxes
    character(*), parameter :: ocpl_r2x_3d_fluxes = &

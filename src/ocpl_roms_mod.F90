@@ -234,10 +234,16 @@ subroutine ocpl_roms_init()
    !--------------------------------------------------------------------------------------
    lsize = mct_gsMap_lsize(gsMap_r, mpicom_r)
 
-   allocate(r2x_3d_r(nlev_r))
+   allocate(r2x_3d_r(nlev_r))  ! on roms vertical grid
    do n=1,nlev_r
       call mct_aVect_init(r2x_3d_r(n), rList=ocpl_r2x_3d_fields, lsize=lsize)
       call mct_aVect_zero(r2x_3d_r(n))
+   end do
+
+   allocate(r2x_3d_rp(nlev_p))  ! on pop vertical grid
+   do n=1,nlev_p
+      call mct_aVect_init(r2x_3d_rp(n), rList=ocpl_r2x_3d_fields, lsize=lsize)
+      call mct_aVect_zero(r2x_3d_rp(n))
    end do
 
    k_r2x_3d_So_temp = mct_aVect_indexRA(r2x_3d_r(1),"So_temp" )
