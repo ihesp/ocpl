@@ -30,19 +30,22 @@ module ocpl_fields_mod
    !----------------------------------------------------------------------------
    ! exchange fields: roms-> pop
    !----------------------------------------------------------------------------
+   ! 2d data in support of 3d data exchange
+   character(*), parameter :: ocpl_fields_r2x_2d_fields = &
+         'reslev'      &    ! max restoring level in pop      DEF
+      //':wgts'             ! merge weights ROMS+POP fields   DEF
+
    ! States
-   character(*), parameter :: ocpl_r2x_3d_states = &
+   character(*), parameter :: ocpl_fields_r2x_3d_states = &
          'So_temp'     &    ! temperature from ROMS           DEF
-      //':So_salt'     &    ! salinity    from ROMS           DEF
-      //':reslev'      &    ! max restoring level in pop      DEF
-      //':wgts'             ! weights for merging ROMS fields DEF
+      //':So_salt'          ! salinity    from ROMS           DEF
 
    ! Fluxes
-   character(*), parameter :: ocpl_r2x_3d_fluxes = &
+   character(*), parameter :: ocpl_fields_r2x_3d_fluxes = &
          '      '           !                                 DEF
 
-   character(*), parameter :: ocpl_r2x_3d_fields = &
-      trim(ocpl_r2x_3d_states)//":"//trim(ocpl_r2x_3d_fluxes)
+   character(*), parameter :: ocpl_fields_r2x_3d_fields = &
+      trim(ocpl_fields_r2x_3d_states)//":"//trim(ocpl_fields_r2x_3d_fluxes)
 
    !----------------------------------------------------------------------------
    ! exchange fields: pop -> roms  2d & 3d boundary data
@@ -86,6 +89,9 @@ module ocpl_fields_mod
 
    integer(IN) :: k_r2x_3d_So_temp
    integer(IN) :: k_r2x_3d_So_salt
+
+   integer(IN) :: k_r2x_2d_reslev
+   integer(IN) :: k_r2x_2d_wgts
 
    save ! save everything
 

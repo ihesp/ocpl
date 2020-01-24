@@ -62,6 +62,8 @@ module ocpl_data_mod
    type(mct_aVect),pointer :: r2x_3d_r (:)   ! roms horiz grid, roms vert grid, (level)
    type(mct_aVect),pointer :: r2x_3d_rp(:)   ! roms horiz grid,  pop vert grid, (level)
    type(mct_aVect),pointer :: r2x_3d_p (:)   ! pop  horiz grid,  pop vert grid, (level)
+   type(mct_aVect)         :: r2x_2d_r       ! additional 2d data needed wrt 3d data
+   type(mct_aVect)         :: r2x_2d_p       ! additional 2d data needed wrt 3d data
 
    !--- roms & pop: number of vertical levels ---
    integer(IN)             :: nlev_p         ! pop : number of vertical levels

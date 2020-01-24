@@ -117,7 +117,7 @@ module ocpl_pop_mod
 
    type(seq_infodata_type), pointer :: infodata   
 
-   integer(IN) :: dbug = 1    ! debug level (higher is more)
+   integer(IN) :: dbug = 0    ! debug level (higher is more)
 
 !=========================================================================================
 contains
@@ -169,7 +169,7 @@ subroutine ocpl_pop_init( p2x_p, p2x_2d_p, p2x_3d_p)
    call mct_aVect_zero(p2x_2d_p)
    p2x_2d_p%rAttr(:,:) = 1.0e30
 
-   !----- init 3d fields specifically for pop/roms coupling -----
+   !----- init 3d fields specifically for pop->roms coupling -----
    write(o_logunit,'(2a,i4)') subName,"     nlev_p    = ",nlev_p
    allocate(p2x_3d_p(nlev_p))
 
@@ -179,6 +179,16 @@ subroutine ocpl_pop_init( p2x_p, p2x_2d_p, p2x_3d_p)
       p2x_3d_p(k)%rAttr(:,:) = 1.0e30
    enddo
 
+   !----- init 3d,2d fields specifically for roms->pop coupling -----
+   write(o_logunit,'(2a,i4)') subName,"     nlev_rp    = ",nlev_rp
+   call mct_aVect_init(r2x_2d_p, rList=ocpl_fields_r2x_2d_fields, lsize=lsize)
+   call mct_aVect_zero(r2x_2d_p)
+   allocate(r2x_3d_p(nlev_rp))
+   do k = 1, nlev_rp
+      call mct_aVect_init(r2x_3d_p(k), rList=ocpl_fields_r2x_3d_fields,lsize=lsize)
+      call mct_aVect_zero(r2x_3d_p(k))
+      p2x_3d_p(k)%rAttr(:,:) = 1.0e30
+   enddo
 
    !--- set aVect field indicies ---
    k_p2x_2d_So_ssh  = mct_aVect_indexRA(p2x_2d_p   ,"So_ssh" )

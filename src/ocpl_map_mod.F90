@@ -51,8 +51,7 @@ module ocpl_map_mod
 
 ! !PRIVATE MODULE DATA:
 
-   integer(IN)           :: debug  = 1    ! debug level
-!  integer(IN),parameter :: debug  = 2    ! debug level
+   integer(IN),parameter :: debug  = 0    ! debug level
    integer(IN),parameter :: nestID = 1    ! roms nest (grid/domain) #1 
 
    type(mct_sMatp)       :: sMatp_p2rc(4) ! curtain amps: pop -> roms (4-curtains: S,E,N,W)
@@ -458,9 +457,6 @@ subroutine ocpl_map_roms2pop()
 !  
 !-----------------------------------------------------------------------------------------
 
-   debug_save = debug
-   debug = 2
-
    if (debug>0) write(o_logUnit,'(2a)') subname,"Enter" ;  call shr_sys_flush(o_logUnit)
 
    !--- for accessing roms arrays with (i,j) indexing ---
@@ -471,7 +467,7 @@ subroutine ocpl_map_roms2pop()
    localISize = iMax - iMin + 1
    localJSize = jMax - jMin + 1
 
-   !-------------------------------------------------------------------------
+   !--------------------------------------------------------------------------------------
    ! Step 1) vertical interpolation: roms levels -> pop levels
    ! Notes:
    ! o need roms(i,j) indicies to access internal roms cell depth array 
@@ -480,16 +476,16 @@ subroutine ocpl_map_roms2pop()
    ! o for roms, level k+1 is shallower than level k
    ! o for pop,  z_p(k) units of depth are cm and are all positive numbers
    ! o for roms, z_r(k) units of depth are  m and are all negative numbers
-   !-------------------------------------------------------------------------
+   !--------------------------------------------------------------------------------------
 
 !  alternate looping option
 !  do j = jMin,jMax  ! j wrt roms(i,j)   ! loop over roms(i,j) and compute aVect(n)
 !  do i = iMin,iMax  ! i wrt roms(i,j)
 !  n = (j-jMin)*localISize + i - iMin + 1
 
-   k_reslev = mct_aVect_indexRA(r2x_3d_r(1),"reslev")
    k_temp   = mct_aVect_indexRA(r2x_3d_r(1),"So_temp")
-   r2x_3d_r(1)%rAttr(k_reslev,:) = 1.0_r8 ! always restore at least one level (surface)
+   k_reslev = mct_aVect_indexRA(r2x_2d_r   ,"reslev")
+   r2x_2d_r%rAttr(k_reslev,:) = 1.0_r8 ! always restore at least one level (surface)
 
    if (debug>2) then
       write(o_logUnit,'(2a,5i5)') subName,"DEBUG: iMin,jMin,nLev_p,nLev_r,nLev_rp=",iMin,jMin,nLev_p,nLev_r,nLev_rp
@@ -510,7 +506,7 @@ subroutine ocpl_map_roms2pop()
       end if
 
       !----- if( pop is shallower than roms) then (restore down to this pop level) -----
-      if (z_p(k_p) <= zMax_r) r2x_3d_r(1)%rAttr(k_reslev,n) = float(k_p) 
+      if (z_p(k_p) <= zMax_r) r2x_2d_r%rAttr(k_reslev,n) = float(k_p) 
 
       if (z_p(k_p) >= zMax_r) then
          !----- target pop level deeper than max roms level => use max roms level -----
@@ -568,7 +564,16 @@ subroutine ocpl_map_roms2pop()
    end do ! n   = 1,mct_aVect_lsize(r2x_3d_r)
    end do ! k_p = 1,nLev_rp 
 
-   debug = debug_save
+
+   !--------------------------------------------------------------------------------------
+   ! Step 2) horizonal interpolation: roms -> pop  (all data at pop vertical levals)
+   !--------------------------------------------------------------------------------------
+   if (debug>0) write(o_logUnit,'(2a)') subname,"map 3d horizontal" ;  call shr_sys_flush(o_logUnit)
+   call mct_sMat_avMult(r2x_2d_r, sMatp_r2o, r2x_2d_p,vector=usevector)
+   do k_p = 1,nLev_rp  
+      if (debug>0) write(o_logUnit,'(2a,i3)') subname,"map 3d horizontal, level=",k_p;  call shr_sys_flush(o_logUnit)
+      call mct_sMat_avMult(r2x_3d_rp(k_p), sMatp_r2o, r2x_3d_p(k_p),vector=usevector)
+   end do 
 
 end subroutine ocpl_map_roms2pop
 

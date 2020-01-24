@@ -236,28 +236,29 @@ subroutine ocpl_roms_init()
 
    allocate(r2x_3d_r(nlev_r))  ! on roms vertical grid
    do n=1,nlev_r
-      call mct_aVect_init(r2x_3d_r(n), rList=ocpl_r2x_3d_fields, lsize=lsize)
+      call mct_aVect_init(r2x_3d_r(n), rList=ocpl_fields_r2x_3d_fields, lsize=lsize)
       call mct_aVect_zero(r2x_3d_r(n))
    end do
 
    allocate(r2x_3d_rp(nlev_p))  ! on pop vertical grid
    do n=1,nlev_p
-      call mct_aVect_init(r2x_3d_rp(n), rList=ocpl_r2x_3d_fields, lsize=lsize)
+      call mct_aVect_init(r2x_3d_rp(n), rList=ocpl_fields_r2x_3d_fields, lsize=lsize)
       call mct_aVect_zero(r2x_3d_rp(n))
    end do
 
+   call mct_aVect_init(r2x_2d_r, rList=ocpl_fields_r2x_2d_fields, lsize=lsize)
+   call mct_aVect_zero(r2x_2d_r)
+
    k_r2x_3d_So_temp = mct_aVect_indexRA(r2x_3d_r(1),"So_temp" )
    k_r2x_3d_So_salt = mct_aVect_indexRA(r2x_3d_r(1),"So_salt" )
+   k_r2x_2d_reslev  = mct_aVect_indexRA(r2x_2d_r   ,"reslev"  )
+   k_r2x_2d_wgts    = mct_aVect_indexRA(r2x_2d_r   ,"wgts"    )
 
    write(o_logunit,'(2a)') subname,"Exit" ;  call shr_sys_flush(o_logunit)
 
 end subroutine ocpl_roms_init
 
 !=========================================================================================
-!BOP !====================================================================================
-!
-! !IROUTINE: ocpl_roms_export
-!
 ! !DESCRIPTION:
 !    put lateral BCs into roms
 !
