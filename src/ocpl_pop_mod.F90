@@ -33,15 +33,6 @@ module ocpl_pop_mod
    use ocpl_fields_mod  
    use ocpl_data_mod
 
-#ifdef OCPLRESTORING
-   use forcing_pt_interior, only: PT_INTERIOR_DATA     ! alter interal pop data for 2-way coupling
-   use forcing_pt_interior, only: PT_RESTORE_RTAU      ! alter interal pop data for 2-way coupling
-   use forcing_pt_interior, only: PT_RESTORE_MAX_LEVEL ! alter interal pop data for 2-way coupling
-   use forcing_s_interior , only:  S_INTERIOR_DATA     ! alter interal pop data for 2-way coupling
-   use forcing_s_interior , only:  S_RESTORE_RTAU      ! alter interal pop data for 2-way coupling
-   use forcing_s_interior , only:  S_RESTORE_MAX_LEVEL ! alter interal pop data for 2-way coupling
-#endif
-
    use mct_mod
 !  use esmf_mod
    use seq_flds_mod
@@ -98,7 +89,7 @@ module ocpl_pop_mod
 
    public :: ocpl_pop_init
    public :: ocpl_pop_export
-!  public :: ocpl_pop_import
+   public :: ocpl_pop_import
 
 
 ! ! PUBLIC DATA:
@@ -216,6 +207,151 @@ end subroutine ocpl_pop_init
 !=========================================================================================
 !BOP !====================================================================================
 !
+! !IROUTINE: ocpl_pop_import
+!
+! !DESCRIPTION:
+!    put input data into pop, ocpl/pop 3d interface  
+!
+! !INTERFACE:
+!
+! !REVISION HISTORY:
+!    2020 Jan -- Brian Kauffman (NCAR), initial version
+!
+! !INTERFACE: ----------------------------------------------------------------------------
+
+!ubroutine ocpl_pop_import( r2x_3d_p, r2x_2d_p)
+subroutine ocpl_pop_import()
+
+! !INPUT/OUTPUT PARAMETERS:
+
+!  type(mct_aVect)             , intent(inout) :: r2x_2d_p
+!  type(mct_aVect),pointer     , intent(inout) :: r2x_3d_p(:)
+
+   use blocks
+   use forcing_pt_interior, only: PT_INTERIOR_DATA     ! alter interal pop data for 2-way coupling
+   use forcing_pt_interior, only: PT_RESTORE_RTAU      ! alter interal pop data for 2-way coupling
+   use forcing_pt_interior, only: PT_RESTORE_MAX_LEVEL ! alter interal pop data for 2-way coupling
+   use forcing_s_interior , only:  S_INTERIOR_DATA     ! alter interal pop data for 2-way coupling
+   use forcing_s_interior , only:  S_RESTORE_RTAU      ! alter interal pop data for 2-way coupling
+   use forcing_s_interior , only:  S_RESTORE_MAX_LEVEL ! alter interal pop data for 2-way coupling
+!EOP
+!BOC
+
+!  local variables
+   type (block)            :: this_block     ! pop block information for current bloc
+   integer(IN)             :: i,j,k,n,iblock,nCellsFromCoast
+   real(r8)                :: rday ! restoring time-scale
+   logical                 :: first_call = .true.
+   character(*), parameter :: subName = "(ocpl_pop_export) "
+
+!-----------------------------------------------------------------------------------------
+!
+!-----------------------------------------------------------------------------------------
+
+   if (dbug > 0) write(o_logunit,'(2a)') subName,"Enter" ; call shr_sys_flush(o_logunit)
+
+   if (dbug > 1) then
+      write(o_logunit,*) "min/max r2x_2d_p%rAttr(k_r2x_2d_wgts,      :)) = ",minval(r2x_2d_p%rAttr(k_r2x_2d_wgts       ,:)) &
+                                                                            ,maxval(r2x_2d_p%rAttr(k_r2x_2d_wgts       ,:))
+      write(o_logunit,*) "min/max r2x_3d_p(1)%rAttr(k_r2x_3d_So_temp,:)) = ",minval(r2x_3d_p(1)%rAttr(k_r2x_3d_So_temp,:)) &
+                                                                            ,maxval(r2x_3d_p(1)%rAttr(k_r2x_3d_So_temp,:))
+      write(o_logunit,*) "min/max r2x_3d_p(1)%rAttr(k_r2x_3d_So_salt,:)) = ",minval(r2x_3d_p(1)%rAttr(k_r2x_3d_So_salt,:)) &
+                                                                            ,maxval(r2x_3d_p(1)%rAttr(k_r2x_3d_So_salt,:))
+      write(o_logunit,*) "nblocks_clinic = ",nblocks_clinic
+      call shr_sys_flush(o_logunit)
+   end if
+
+
+   n = 0
+   do iblock = 1, nblocks_clinic
+      this_block = get_block(blocks_clinic(iblock),iblock)
+      if (dbug > 1) then
+         write(o_logunit,'(2a,i3)'    ) subName,"iblock = ",iblock
+         write(o_logunit,'(2a,2e12.3)') subName,"orig  min/max PT_RESTORE_RTAU = ",minval(PT_RESTORE_RTAU     (:,:  ,iblock)  ) &
+                                                                                  ,maxval(PT_RESTORE_RTAU     (:,:  ,iblock)  )
+         write(o_logunit,'(2a,2e12.3)') subName,"orig  min/max PT_INTERIOR_DATA= ",minval(PT_INTERIOR_DATA    (:,:,1,iblock,1)) &
+                                                                                  ,maxval(PT_INTERIOR_DATA    (:,:,1,iblock,1))
+         write(o_logunit,'(2a,2i12  )') subName,"orig  min/max PT_RESTORE_MAX_L= ",minval(PT_RESTORE_MAX_LEVEL(:,:  ,iblock  )) &
+                                                                                  ,maxval(PT_RESTORE_MAX_LEVEL(:,:  ,iblock  ))
+         write(o_logunit,'(2a,2e12.3)') subName,"orig  min/max  S_RESTORE_RTAU = ",minval( S_RESTORE_RTAU     (:,:  ,iblock)  ) &
+                                                                                  ,maxval( S_RESTORE_RTAU     (:,:  ,iblock)  )
+         write(o_logunit,'(2a,2e12.3)') subName,"orig  min/max  S_INTERIOR_DATA= ",minval( S_INTERIOR_DATA    (:,:,1,iblock,1)) &
+                                                                                  ,maxval( S_INTERIOR_DATA    (:,:,1,iblock,1))
+         write(o_logunit,'(2a,2i12  )') subName,"orig  min/max  S_RESTORE_MAX_L= ",minval( S_RESTORE_MAX_LEVEL(:,:  ,iblock  )) &
+                                                                                  ,maxval( S_RESTORE_MAX_LEVEL(:,:  ,iblock  )) 
+         call shr_sys_flush(o_logunit)
+      end if
+
+
+      do j=this_block%jb,this_block%je
+      do i=this_block%ib,this_block%ie
+         n = n + 1
+
+         if (first_call) then !-----------------------------------------------------------
+
+            write(o_logunit,'(2a)') subName,"first call: ID coastal points for surface restoring only"
+
+            !----- restoring timescale goes to zero near edge of restoring zone -----
+            if (r2x_2d_p%rAttr(k_r2x_2d_wgts,n) < 0.001_r8) r2x_2d_p%rAttr(k_r2x_2d_wgts,n) = c0  ! no restoring
+            rday =   10.0_r8  !   10 day - strong
+            PT_RESTORE_RTAU(i,j,iblock) =  r2x_2d_p%rAttr(k_r2x_2d_wgts   ,n) / (  rday * 86400.0)
+
+            !----- restoring depth limited to surface layer near coast -----
+            nCellsFromCoast = PT_RESTORE_MAX_LEVEL(i,j,iblock)  ! input PT restore files needs to have this data set
+            if (nCellsFromCoast < 1) then
+               write(o_logunit,'(2a,2i6,a   )') subName,"i,j =",i,j,", land cell"
+               PT_RESTORE_MAX_LEVEL(i,j,iblock) = 0
+            else if (nCellsFromCoast <= 4) then
+               write(o_logunit,'(2a,2i6,a,i6)') subName,"i,j =",i,j,", coastal cell, distance from coast =",n
+               PT_RESTORE_MAX_LEVEL(i,j,iblock) = 1 ! limit PT to surface restoring only (?)
+            else
+               write(o_logunit,'(2a,2i6,a   )') subName,"i,j =",i,j,", cells from coast > 4"
+               PT_RESTORE_MAX_LEVEL(i,j,iblock) = max(1,int(r2x_2d_p%rAttr(k_r2x_2d_reslev,n) ))
+            end if
+            if (dbug > 1) write(o_logunit,'(2a,3i6)') subName,"max level i,j =",PT_RESTORE_MAX_LEVEL(i,j,iblock),i,j
+
+            !----- salinity gets same treatment as temperature ----- 
+            S_RESTORE_RTAU     (i,j,iblock) = PT_RESTORE_RTAU     (i,j,iblock) ! use same restoring as PT
+            S_RESTORE_MAX_LEVEL(i,j,iblock) = PT_RESTORE_MAX_LEVEL(i,j,iblock)
+
+            !----- flags unset data -----
+            PT_INTERIOR_DATA(i,j,k,iblock,1) = -9999.0
+             S_INTERIOR_DATA(i,j,k,iblock,1) = -8888.0
+         end if !-------------------------------------------------------------------------
+
+         !----- use latest temperature & salinity data from roms (needs unit conversion?) -----
+      !  do k=1,PT_RESTORE_MAX_LEVEL(i,j,iblock)
+         do k=1,nLev_rp
+             PT_INTERIOR_DATA(i,j,k,iblock,1) = r2x_3d_p(k)%rAttr(k_r2x_3d_So_temp,n) - T0_kelvin
+              S_INTERIOR_DATA(i,j,k,iblock,1) = r2x_3d_p(k)%rAttr(k_r2x_3d_So_salt,n) ! * 0.001_r8
+         end do
+      enddo ! i
+      enddo ! j
+
+      if (dbug > 1) then
+         write(o_logunit,'(2a,2e12.3)') subName,"after min/max PT_RESTORE_RTAU = ",minval(PT_RESTORE_RTAU     (:,:  ,iblock)  ) &
+                                                                                  ,maxval(PT_RESTORE_RTAU     (:,:  ,iblock)  )
+         write(o_logunit,'(2a,2e12.3)') subName,"after min/max PT_INTERIOR_DATA= ",minval(PT_INTERIOR_DATA    (:,:,1,iblock,1)) &
+                                                                                  ,maxval(PT_INTERIOR_DATA    (:,:,1,iblock,1))
+         write(o_logunit,'(2a,2i12  )') subName,"after min/max PT_RESTORE_MAX_L= ",minval(PT_RESTORE_MAX_LEVEL(:,:  ,iblock  )) &
+                                                                                  ,maxval(PT_RESTORE_MAX_LEVEL(:,:  ,iblock  ))
+         write(o_logunit,'(2a,2e12.3)') subName,"after min/max  S_RESTORE_RTAU = ",minval( S_RESTORE_RTAU     (:,:  ,iblock)  ) &
+                                                                                  ,maxval( S_RESTORE_RTAU     (:,:  ,iblock)  )
+         write(o_logunit,'(2a,2e12.3)') subName,"after min/max  S_INTERIOR_DATA= ",minval( S_INTERIOR_DATA    (:,:,1,iblock,1)) &
+                                                                                  ,maxval( S_INTERIOR_DATA    (:,:,1,iblock,1))
+         write(o_logunit,'(2a,2i12  )') subName,"after min/max  S_RESTORE_MAX_L= ",minval( S_RESTORE_MAX_LEVEL(:,:  ,iblock  )) &
+                                                                                  ,maxval( S_RESTORE_MAX_LEVEL(:,:  ,iblock  ))
+      end if
+
+   enddo ! iblock
+
+   if (first_call ) first_call = .false.
+
+end subroutine ocpl_pop_import
+
+!=========================================================================================
+!BOP !====================================================================================
+!
 ! !IROUTINE: ocpl_pop_export
 !
 ! !DESCRIPTION:
@@ -235,12 +371,12 @@ subroutine ocpl_pop_export( p2x_2d_p, p2x_3d_p)
    type(mct_aVect)             , intent(inout) :: p2x_2d_p
    type(mct_aVect),pointer     , intent(inout) :: p2x_3d_p(:)
 
-   type(mct_aVect) :: global_p  !  for debug global gather test
 !EOP
 !BOC
 
-!-----------------------------------------------------------------------------------------
-!  local variables
+   !----- local variables -----
+
+   type(mct_aVect) :: global_p  !  for debug global gather test
 
 #ifdef _OPENMP
    integer, external :: omp_get_max_threads  ! max number of threads that can execute

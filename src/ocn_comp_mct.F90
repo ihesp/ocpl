@@ -332,8 +332,8 @@ contains
    !----------------------------------------------------------------------------
    ! import data into pop (pop 3d restoring)
    !----------------------------------------------------------------------------
-!  write(o_logunit,F01) "import ocean coupling fields into pop (3d restoring)" ; call shr_sys_flush(o_logunit)
-!  call ocpl_pop_import( )
+   write(o_logunit,F01) "import ocean coupling fields into pop (3d restoring)" ; call shr_sys_flush(o_logunit)
+   call ocpl_pop_import( )
 
    !----------------------------------------------------------------------------
    ! run pop

@@ -199,12 +199,12 @@ subroutine ocpl_map_pop2roms()
    real(R8)    :: w1 ,w2              ! interp weight assigned to lower,upper pop levels
    real(R8)    :: F1 ,F2, Fr          ! pop data values and target roms data value
    real(R8)    :: depth_r             ! depth of roms point being interpolated to
-   real(R8),allocatable,save :: depth_p(:) ! depths of pop data 
+   real(R8),allocatable :: depth_p(:) ! depths of pop data 
    real(R8)    :: zr,zp1,zp2          ! depth roms value and surrounding pop layers
    logical     :: do_mapping          ! flags that this local tile reqires mapping
    logical     :: first_call = .true. ! flags 1st-time setup operations
 
-   type(mct_aVect),allocatable,save :: p2x_3d_pvert_rc(:,:) ! aVect on roms horiz grid but pop vertical grid
+   type(mct_aVect),allocatable :: p2x_3d_pvert_rc(:,:) ! aVect on roms horiz grid but pop vertical grid
 
    integer(IN) :: kfld                ! field index
    real(R8)    :: xmin,xmax           ! debug info
@@ -428,6 +428,7 @@ subroutine ocpl_map_roms2pop()
    use grid,         only: z_p         => zw     ! pop depth array
    use mod_grid,     only: ROMS_GRID   => GRID
    use mod_param,    only: ROMS_BOUNDS => BOUNDS
+   use mod_param,    only: Lm,Mm                 ! max global roms indicies
    use mod_parallel, only: MyRank
 
 !EOP
@@ -436,20 +437,19 @@ subroutine ocpl_map_roms2pop()
    !----- local variables -----
    integer(IN)        :: i,j,n                   ! spatial index wrt data(i,j) or data(n)
    integer(IN)        :: k,k_p,k_r,k0_r,k1_r     ! vertical index
-   integer(IN)        :: iMin,iMax,jMin,jMax     ! range for roms(i,j)
+   integer(IN)        :: iMin,iMax,jMin,jMax     ! range for roms(i,j), for local tile
+   integer(IN)        :: LBi,LBj,UBi,UBj         ! range for roms(i,j), for global grid
    integer(IN)        :: localIsize,localJsize   ! roms array size
-   integer(IN)        :: k_reslev                ! temp index for a field in an rAttr
    integer(IN)        :: k_temp                  ! temp index for a field in an rAttr
    real(r8)           :: zMin_r,zMax_r           ! min/max roms column depth
    real(r8)           :: z0_r,z1_r               ! roms UB/LB column depths
    real(r8)           :: f0,f1                   ! vertical interp weights
    integer(IN)        :: lSize                   ! local aVect size
-   type(mct_aVect)    :: r2x_p_ftemp             ! temporary flux  attribute vector
-   type(mct_aVect)    :: r2x_p_stemp             ! temporary state attribute vector
-   real(r8)           :: pmin, pmax, rmin, rmax  ! min/max values for debugg
+!  real(r8)           :: pmin, pmax, rmin, rmax  ! min/max values for debuging
+   real(r8)           :: xmin, xmax              ! min/max values for debugging
+   real(r8)           :: diff                    ! distance of index from edge of domain
    real(r8),parameter :: eps = 1.0e-12           ! epsilon for error checking
-
-   integer :: debug_save
+   logical            :: first_call = .true.
 
    character(*), parameter :: subName = "(ocpl_map_roms2pop) "
 
@@ -466,6 +466,56 @@ subroutine ocpl_map_roms2pop()
    jMax = ROMS_BOUNDS(nestID)%JendR(MyRank)
    localISize = iMax - iMin + 1
    localJSize = jMax - jMin + 1
+   LBi  = 1
+   LBj  = 1                              
+   UBi  = Lm(MyRank)   ! global i size
+   UBj  = Mm(MyRank)   ! global j size
+
+   !--- create weights that are 1.0 in roms interior, ramping down to 0.0 at roms boundary ---
+   if (first_call) then
+      write(o_logUnit,*) subname,"<debug> LBi,LBj,UBi,UBj=",LBi,LBj,UBi,UBj
+      lsize = mct_aVect_lSize(r2x_3d_r(1)) 
+      if ( mct_aVect_lSize(r2x_2d_r) == 0) then  ! local tile size = 0 (not data on this PE)
+         write(o_logUnit,'(2a)') subname,"create domain edge weights (this tile lsize = 0)" 
+      else
+         write(o_logUnit,'(2a)') subname,"create domain edge weights" ;  call shr_sys_flush(o_logUnit)
+         do n = 1,mct_aVect_lSize(r2x_3d_r(1)) ! loop over aVect(n), need corresponding roms global i,j 
+            i = mod(n-1,localISize) + iMin
+            j = n/localISize        + jMin     ! requires/assumes fortran truncation
+
+            r2x_2d_r%rAttr(k_r2x_2d_wgts,n) = 1.0_R8  ! default merge weight is 1.0, lower value need boundaries...
+            !---- kludge: ramp to zero over 40 cells adjacent to boundary, need !a better algorithm
+            if (      (i - LBi) < 40 ) then
+               diff = max( 0.0_R8, (i-LBi)/40.0_R8)
+               r2x_2d_r%rAttr(k_r2x_2d_wgts,n) = min(diff,r2x_2d_r%rAttr(k_r2x_2d_wgts,n))
+            else if ( (UBi - i) < 40 ) then
+               diff = max( 0.0_R8, (UBi-i)/40.0_R8)
+               r2x_2d_r%rAttr(k_r2x_2d_wgts,n) = min(diff,r2x_2d_r%rAttr(k_r2x_2d_wgts,n))
+            end if
+            if (     (j - LBj) < 40 ) then
+               diff = max( 0.0_R8, (j-LBj)/40.0_R8)
+               r2x_2d_r%rAttr(k_r2x_2d_wgts,n) = min(diff,r2x_2d_r%rAttr(k_r2x_2d_wgts,n))
+            else if ( (UBj - j) < 40 ) then
+               diff = max( 0.0_R8, (UBj-j)/40.0_R8)
+               r2x_2d_r%rAttr(k_r2x_2d_wgts,n) = min(diff,r2x_2d_r%rAttr(k_r2x_2d_wgts,n))
+            end if
+         end do
+         if (debug>0 ) then
+            xmin = minval(r2x_2d_r%rAttr(k_r2x_2d_wgts,:))
+            xmax = maxval(r2x_2d_r%rAttr(k_r2x_2d_wgts,:))
+            write(o_logUnit,'(2a,2f6.3)') subname,"roms 2d merge weight min/max = ",xmin,xmax 
+            call shr_sys_flush(o_logUnit)
+         end if
+      end if
+      call mct_sMat_avMult(r2x_2d_r, sMatp_r2o, r2x_2d_p,vector=usevector)
+      if (debug>0 ) then
+         xmin = minval(r2x_2d_p%rAttr(k_r2x_2d_wgts,:))
+         xmax = maxval(r2x_2d_p%rAttr(k_r2x_2d_wgts,:))
+         write(o_logUnit,'(2a,2f6.3)') subname,"pop  2d merge weight min/max = ",xmin,xmax 
+         call shr_sys_flush(o_logUnit)
+      end if  
+   end if
+   first_call = .false.
 
    !--------------------------------------------------------------------------------------
    ! Step 1) vertical interpolation: roms levels -> pop levels
@@ -483,9 +533,7 @@ subroutine ocpl_map_roms2pop()
 !  do i = iMin,iMax  ! i wrt roms(i,j)
 !  n = (j-jMin)*localISize + i - iMin + 1
 
-   k_temp   = mct_aVect_indexRA(r2x_3d_r(1),"So_temp")
-   k_reslev = mct_aVect_indexRA(r2x_2d_r   ,"reslev")
-   r2x_2d_r%rAttr(k_reslev,:) = 1.0_r8 ! always restore at least one level (surface)
+   r2x_2d_r%rAttr(k_r2x_2d_reslev,:) = 1.0_r8 ! always restore at least one level (surface)
 
    if (debug>2) then
       write(o_logUnit,'(2a,5i5)') subName,"DEBUG: iMin,jMin,nLev_p,nLev_r,nLev_rp=",iMin,jMin,nLev_p,nLev_r,nLev_rp
@@ -499,30 +547,30 @@ subroutine ocpl_map_roms2pop()
       zMin_r = -ROMS_GRID(nestID)%z_r(i,j,nLev_r)*100.0_r8  ! shallowest roms level (convert m to cm)
       zMax_r = -ROMS_GRID(nestID)%z_r(i,j,     1)*100.0_r8  ! deepest    roms level (convert m to cm)
 
-      if (debug>1 .and. mod(n,400)==0 ) then
+      if (debug>1 .and. mod(n-1,400)==0 ) then
       !  write(o_logUnit,'(2a,6i5)'  ) subName,"DEBUG: iMin,jMin,i,j,n,n2=",iMin,jMin,i,j,n,(j-jMin)*localISize + i - iMin + 1
          write(o_logUnit,'(2a,5i5)'  ) subName,"DEBUG: i,j,n,k_p   =",i,j,n,k_p
          write(o_logUnit,'(2a,3f9.1)') subName,"DEBUG: zMin_r,z_p(k_p),zMax_r=",zMin_r,z_p(k_p),zMax_r
       end if
 
       !----- if( pop is shallower than roms) then (restore down to this pop level) -----
-      if (z_p(k_p) <= zMax_r) r2x_2d_r%rAttr(k_reslev,n) = float(k_p) 
+      if (z_p(k_p) <= zMax_r) r2x_2d_r%rAttr(k_r2x_2d_reslev,n) = float(k_p) 
 
       if (z_p(k_p) >= zMax_r) then
          !----- target pop level deeper than max roms level => use max roms level -----
          r2x_3d_rp(k_p)%rAttr(:,n) = r2x_3d_r(nLev_r)%rAttr(:,n)
-         if (debug>1 .and. mod(n,400)==0 ) then
+         if (debug>1 .and. mod(n-1,400)==0 ) then
             write(o_logUnit,'(2a)') subName,"  DEBUG: use max roms level"
          end if
 
       else if (z_p(k_p) <= zMin_r) then
          !----- target pop level shallower than min roms level => use min roms level -----
          r2x_3d_rp(k_p)%rAttr(:,n) = r2x_3d_r(1     )%rAttr(:,n)
-         if (debug>1 .and. mod(n,400)==0 ) then
+         if (debug>1 .and. mod(n-1,400)==0 ) then
             write(o_logUnit,'(2a)') subName,"  DEBUG: use min roms level"
          end if
       else
-         if (debug>1 .and. mod(n,400)==0 ) then
+         if (debug>1 .and. mod(n-1,400)==0 ) then
             write(o_logUnit,'(2a)') subName,"  DEBUG: vertical interpolation..."
          end if
 
@@ -550,7 +598,7 @@ subroutine ocpl_map_roms2pop()
             write(o_logUnit,*) subName," ERROR: f0,f1              =", f0,f1
             call shr_sys_abort(subName//"ERROR: vertical interp")
          end if
-         if (debug>1 .and. mod(n,400)==0 ) then
+         if (debug>1 .and. mod(n-1,400)==0 ) then
             write(o_logUnit,'(2a,5i5  )') subName,"  DEBUG: i,j,n,k_p,k1_r =", i,j,n,k_p,k1_r
             write(o_logUnit,'(2a,2f8.3)') subName,"  DEBUG: f0,f1 =", f0,f1
             write(o_logUnit,'(2a,3f8.1)') subName,"  DEBUG: z_LB_r,z_target,z_UB =",z0_r,z_p(k_p),z1_r
