@@ -251,8 +251,11 @@ subroutine ocpl_roms_init()
 
    k_r2x_3d_So_temp = mct_aVect_indexRA(r2x_3d_r(1),"So_temp" )
    k_r2x_3d_So_salt = mct_aVect_indexRA(r2x_3d_r(1),"So_salt" )
-   k_r2x_2d_reslev  = mct_aVect_indexRA(r2x_2d_r   ,"reslev"  )
-   k_r2x_2d_wgts    = mct_aVect_indexRA(r2x_2d_r   ,"wgts"    )
+   k_r2x_2d_frac    = mct_aVect_indexRA(r2x_2d_r   ,"So_frac"  )
+   k_r2x_2d_reslev  = mct_aVect_indexRA(r2x_2d_r   ,"So_reslev")
+   k_r2x_2d_wgts    = mct_aVect_indexRA(r2x_2d_r   ,"So_wgts"  )
+
+   r2x_2d_r%rAttr(k_r2x_2d_frac,:) = 1.0_r8
 
    write(o_logunit,'(2a)') subname,"Exit" ;  call shr_sys_flush(o_logunit)
 

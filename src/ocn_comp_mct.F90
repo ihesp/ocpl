@@ -47,6 +47,7 @@ module ocn_comp_mct
    use ocpl_map_mod
    use ocpl_pop_mod
    use ocpl_roms_mod
+   use ocpl_fields_mod ! for temporary debug/validation info
 
 ! !PUBLIC MEMBER FUNCTIONS:
 
@@ -334,6 +335,7 @@ contains
    !----------------------------------------------------------------------------
    write(o_logunit,F01) "import ocean coupling fields into pop (3d restoring)" ; call shr_sys_flush(o_logunit)
    call ocpl_pop_import( )
+   !all ocpl_pop_import(o2x_o ) ! for debugging pop restoring
 
    !----------------------------------------------------------------------------
    ! run pop
@@ -391,9 +393,12 @@ contains
    k = mct_avect_indexra(o2x_o,'So_t')
    lsize_o = mct_aVect_lsize( o2x_o )
    do n=1,lsize_o
-      if (r2x_o%rAttr(k,n) > 1.0) then  ! has data mapped from roms (unmapped cells have sst = 0)
-          o2x_o%rAttr(:,n) = r2x_o%rAttr(:,n)  ! merge all fields
-      !   o2x_o%rAttr(k,n) = r2x_o%rAttr(k,n)  ! merge SST only
+   !  if (r2x_o%rAttr(k,n) > 1.0) then  ! has data mapped from roms (unmapped cells have sst = 0)
+      if (r2x_2d_p%rAttr(k_r2x_2d_frac,n) > 0.01) then ! has data mapped from roms
+      !   o2x_o%rAttr(:,n) = r2x_o%rAttr(:,n)  ! merge all fields
+      !   o2x_o%rAttr(k,n) = r2x_o%rAttr(k,n)  ! merge SST only  DEBUG: doesn't merge/clobber additional debug fields
+          o2x_o%rAttr(k,n) = (1.0_r8 - r2x_2d_p%rAttr(k_r2x_2d_frac,n))*o2x_o%rAttr(k,n) &
+                           +           r2x_2d_p%rAttr(k_r2x_2d_frac,n) *r2x_o%rAttr(k,n)
       end if
    end do
 

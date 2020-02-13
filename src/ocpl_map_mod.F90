@@ -51,7 +51,8 @@ module ocpl_map_mod
 
 ! !PRIVATE MODULE DATA:
 
-   integer(IN),parameter :: debug  = 0    ! debug level
+!  integer(IN),parameter :: debug  = 0    ! debug level
+   integer(IN)           :: debug  = 0    ! debug level
    integer(IN),parameter :: nestID = 1    ! roms nest (grid/domain) #1 
 
    type(mct_sMatp)       :: sMatp_p2rc(4) ! curtain amps: pop -> roms (4-curtains: S,E,N,W)
@@ -179,7 +180,7 @@ subroutine ocpl_map_pop2roms()
    use mod_parallel, only: MyRank                ! roms internal data
    use grid        , only: pop_depth => zt       ! pop  internal data
  
-   integer(IN),parameter  :: nestID = 1    ! roms nest (grid/domain) #1 
+!  integer(IN),parameter  :: nestID = 1    ! roms nest (grid/domain) #1  
 
 
 !EOP
@@ -427,8 +428,9 @@ subroutine ocpl_map_roms2pop()
 
    use grid,         only: z_p         => zw     ! pop depth array
    use mod_grid,     only: ROMS_GRID   => GRID
-   use mod_param,    only: ROMS_BOUNDS => BOUNDS
-   use mod_param,    only: Lm,Mm                 ! max global roms indicies
+   use mod_param,    only: ROMS_BOUNDS => BOUNDS, & 
+                           globalISize0 => Lm, &
+                           globalJSize0 => Mm  
    use mod_parallel, only: MyRank
 
 !EOP
@@ -456,7 +458,7 @@ subroutine ocpl_map_roms2pop()
 !-----------------------------------------------------------------------------------------
 !  
 !-----------------------------------------------------------------------------------------
-
+ 
    if (debug>0) write(o_logUnit,'(2a)') subname,"Enter" ;  call shr_sys_flush(o_logUnit)
 
    !--- for accessing roms arrays with (i,j) indexing ---
@@ -468,52 +470,52 @@ subroutine ocpl_map_roms2pop()
    localJSize = jMax - jMin + 1
    LBi  = 1
    LBj  = 1                              
-   UBi  = Lm(MyRank)   ! global i size
-   UBj  = Mm(MyRank)   ! global j size
+   UBi  = globalISize0(nestID) + 1
+   UBj  = globalJSize0(nestID) + 1
 
    !--- create weights that are 1.0 in roms interior, ramping down to 0.0 at roms boundary ---
    if (first_call) then
-      write(o_logUnit,*) subname,"<debug> LBi,LBj,UBi,UBj=",LBi,LBj,UBi,UBj
-      lsize = mct_aVect_lSize(r2x_3d_r(1)) 
+      write(o_logUnit,'(2a,4i7)') subname,"roms grid:  local: LBi,LBj,UBi,UBj=",iMin,jMin,iMax,jMax
+      write(o_logUnit,'(2a,4i7)') subname,"roms grid, global: LBi,LBj,UBi,UBj=",LBi,LBj,UBi,UBj
       if ( mct_aVect_lSize(r2x_2d_r) == 0) then  ! local tile size = 0 (not data on this PE)
-         write(o_logUnit,'(2a)') subname,"create domain edge weights (this tile lsize = 0)" 
+         write(o_logUnit,'(2a)') subname,"create roms domain edge weights (this tile lsize = 0)" 
+         write(o_logUnit,'(2a)') subname,"roms edge weight min/max = N/A (lsize=0)"
       else
-         write(o_logUnit,'(2a)') subname,"create domain edge weights" ;  call shr_sys_flush(o_logUnit)
-         do n = 1,mct_aVect_lSize(r2x_3d_r(1)) ! loop over aVect(n), need corresponding roms global i,j 
+         write(o_logUnit,'(2a)') subname,"create roms domain edge weights" ;  call shr_sys_flush(o_logUnit)
+         do n = 1, mct_aVect_lSize(r2x_2d_r) ! loop over roms aVect(n), need corresponding roms global i,j 
             i = mod(n-1,localISize) + iMin
             j = n/localISize        + jMin     ! requires/assumes fortran truncation
 
-            r2x_2d_r%rAttr(k_r2x_2d_wgts,n) = 1.0_R8  ! default merge weight is 1.0, lower value need boundaries...
             !---- kludge: ramp to zero over 40 cells adjacent to boundary, need !a better algorithm
-            if (      (i - LBi) < 40 ) then
-               diff = max( 0.0_R8, (i-LBi)/40.0_R8)
-               r2x_2d_r%rAttr(k_r2x_2d_wgts,n) = min(diff,r2x_2d_r%rAttr(k_r2x_2d_wgts,n))
-            else if ( (UBi - i) < 40 ) then
-               diff = max( 0.0_R8, (UBi-i)/40.0_R8)
-               r2x_2d_r%rAttr(k_r2x_2d_wgts,n) = min(diff,r2x_2d_r%rAttr(k_r2x_2d_wgts,n))
-            end if
-            if (     (j - LBj) < 40 ) then
-               diff = max( 0.0_R8, (j-LBj)/40.0_R8)
-               r2x_2d_r%rAttr(k_r2x_2d_wgts,n) = min(diff,r2x_2d_r%rAttr(k_r2x_2d_wgts,n))
-            else if ( (UBj - j) < 40 ) then
-               diff = max( 0.0_R8, (UBj-j)/40.0_R8)
-               r2x_2d_r%rAttr(k_r2x_2d_wgts,n) = min(diff,r2x_2d_r%rAttr(k_r2x_2d_wgts,n))
-            end if
+            diff = 1.0_r8
+            if (abs(i-LBi)<40) diff = min(diff,abs(i-LBi)/40.0_r8)
+            if (abs(i-UBi)<40) diff = min(diff,abs(i-UBi)/40.0_r8)
+            if (abs(j-LBj)<40) diff = min(diff,abs(j-LBj)/40.0_r8)
+            if (abs(j-UBj)<40) diff = min(diff,abs(j-UBj)/40.0_r8)
+            r2x_2d_r%rAttr(k_r2x_2d_wgts,n) = diff
          end do
          if (debug>0 ) then
             xmin = minval(r2x_2d_r%rAttr(k_r2x_2d_wgts,:))
             xmax = maxval(r2x_2d_r%rAttr(k_r2x_2d_wgts,:))
-            write(o_logUnit,'(2a,2f6.3)') subname,"roms 2d merge weight min/max = ",xmin,xmax 
+            write(o_logUnit,'(2a,2f6.3)') subname,"roms edge weight min/max = ",xmin,xmax 
             call shr_sys_flush(o_logUnit)
          end if
       end if
+
+      !----- map merge weights: roms -> pop -----
       call mct_sMat_avMult(r2x_2d_r, sMatp_r2o, r2x_2d_p,vector=usevector)
+
       if (debug>0 ) then
-         xmin = minval(r2x_2d_p%rAttr(k_r2x_2d_wgts,:))
-         xmax = maxval(r2x_2d_p%rAttr(k_r2x_2d_wgts,:))
-         write(o_logUnit,'(2a,2f6.3)') subname,"pop  2d merge weight min/max = ",xmin,xmax 
+         if ( mct_aVect_lSize(r2x_2d_p) ==  0) then  ! local tile size = 0 (not data on this PE)
+            write(o_logUnit,'(2a      )') subname,"pop  edge weight min/max = N/A (lsize=0)"
+         else
+            xmin = minval(r2x_2d_p%rAttr(k_r2x_2d_wgts,:))
+            xmax = maxval(r2x_2d_p%rAttr(k_r2x_2d_wgts,:))
+            write(o_logUnit,'(2a,2f6.3)') subname,"pop  edge weight min/max = ",xmin,xmax 
+         end if
          call shr_sys_flush(o_logUnit)
       end if  
+
    end if
    first_call = .false.
 
@@ -617,7 +619,9 @@ subroutine ocpl_map_roms2pop()
    ! Step 2) horizonal interpolation: roms -> pop  (all data at pop vertical levals)
    !--------------------------------------------------------------------------------------
    if (debug>0) write(o_logUnit,'(2a)') subname,"map 3d horizontal" ;  call shr_sys_flush(o_logUnit)
+
    call mct_sMat_avMult(r2x_2d_r, sMatp_r2o, r2x_2d_p,vector=usevector)
+
    do k_p = 1,nLev_rp  
       if (debug>0) write(o_logUnit,'(2a,i3)') subname,"map 3d horizontal, level=",k_p;  call shr_sys_flush(o_logUnit)
       call mct_sMat_avMult(r2x_3d_rp(k_p), sMatp_r2o, r2x_3d_p(k_p),vector=usevector)

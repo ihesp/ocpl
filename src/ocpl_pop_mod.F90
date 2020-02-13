@@ -219,13 +219,8 @@ end subroutine ocpl_pop_init
 !
 ! !INTERFACE: ----------------------------------------------------------------------------
 
-!ubroutine ocpl_pop_import( r2x_3d_p, r2x_2d_p)
+!ubroutine ocpl_pop_import(o2x_o)   ! o2x_o used to put temporary debug fields onto cpl history file
 subroutine ocpl_pop_import()
-
-! !INPUT/OUTPUT PARAMETERS:
-
-!  type(mct_aVect)             , intent(inout) :: r2x_2d_p
-!  type(mct_aVect),pointer     , intent(inout) :: r2x_3d_p(:)
 
    use blocks
    use forcing_pt_interior, only: PT_INTERIOR_DATA     ! alter interal pop data for 2-way coupling
@@ -234,6 +229,11 @@ subroutine ocpl_pop_import()
    use forcing_s_interior , only:  S_INTERIOR_DATA     ! alter interal pop data for 2-way coupling
    use forcing_s_interior , only:  S_RESTORE_RTAU      ! alter interal pop data for 2-way coupling
    use forcing_s_interior , only:  S_RESTORE_MAX_LEVEL ! alter interal pop data for 2-way coupling
+
+! !INPUT/OUTPUT PARAMETERS:
+
+!  type(mct_aVect)             , intent(inout) :: o2x_o   
+
 !EOP
 !BOC
 
@@ -241,111 +241,163 @@ subroutine ocpl_pop_import()
    type (block)            :: this_block     ! pop block information for current bloc
    integer(IN)             :: i,j,k,n,iblock,nCellsFromCoast
    real(r8)                :: rday ! restoring time-scale
+   real(r8)                :: frac ! roms cell fraction mapped to pop grid
    logical                 :: first_call = .true.
-   character(*), parameter :: subName = "(ocpl_pop_export) "
+   integer(IN)             :: dbug_save
+   character(*), parameter :: subName = "(ocpl_pop_import) "
 
 !-----------------------------------------------------------------------------------------
 !
 !-----------------------------------------------------------------------------------------
 
+   dbug_save = dbug ! debug this routine (only?)
+   dbug = 2
+
    if (dbug > 0) write(o_logunit,'(2a)') subName,"Enter" ; call shr_sys_flush(o_logunit)
 
-   if (dbug > 1) then
-      write(o_logunit,*) "min/max r2x_2d_p%rAttr(k_r2x_2d_wgts,      :)) = ",minval(r2x_2d_p%rAttr(k_r2x_2d_wgts       ,:)) &
-                                                                            ,maxval(r2x_2d_p%rAttr(k_r2x_2d_wgts       ,:))
-      write(o_logunit,*) "min/max r2x_3d_p(1)%rAttr(k_r2x_3d_So_temp,:)) = ",minval(r2x_3d_p(1)%rAttr(k_r2x_3d_So_temp,:)) &
-                                                                            ,maxval(r2x_3d_p(1)%rAttr(k_r2x_3d_So_temp,:))
-      write(o_logunit,*) "min/max r2x_3d_p(1)%rAttr(k_r2x_3d_So_salt,:)) = ",minval(r2x_3d_p(1)%rAttr(k_r2x_3d_So_salt,:)) &
-                                                                            ,maxval(r2x_3d_p(1)%rAttr(k_r2x_3d_So_salt,:))
-      write(o_logunit,*) "nblocks_clinic = ",nblocks_clinic
+   if (dbug > 1) then !----- optional debug info -----
+      write(o_logunit,'(2a,2e12.3)') subName,"min/max r2x_2d_p%rAttr(k_r2x_2d_wgts,      :)) = " &
+                                    ,minval(r2x_2d_p   %rAttr(k_r2x_2d_wgts   ,:)) &
+                                    ,maxval(r2x_2d_p   %rAttr(k_r2x_2d_wgts   ,:))
+      write(o_logunit,'(2a,2e12.3)') subName,"min/max r2x_2d_p%rAttr(k_r2x_2d_frac,      :)) = " &
+                                    ,minval(r2x_2d_p   %rAttr(k_r2x_2d_frac   ,:)) &
+                                    ,maxval(r2x_2d_p   %rAttr(k_r2x_2d_frac   ,:))
+      write(o_logunit,'(2a,2e12.3)') subName,"min/max r2x_3d_p(1)%rAttr(k_r2x_3d_So_temp,:)) = " &
+                                    ,minval(r2x_3d_p(1)%rAttr(k_r2x_3d_So_temp,:)) &
+                                    ,maxval(r2x_3d_p(1)%rAttr(k_r2x_3d_So_temp,:))
+      write(o_logunit,'(2a,2e12.3)') subName,"min/max r2x_3d_p(1)%rAttr(k_r2x_3d_So_salt,:)) = " &
+                                    ,minval(r2x_3d_p(1)%rAttr(k_r2x_3d_So_salt,:)) &
+                                    ,maxval(r2x_3d_p(1)%rAttr(k_r2x_3d_So_salt,:))
+      write(o_logunit,'(2a,i3)'    ) subName,"nblocks_clinic = ",nblocks_clinic
       call shr_sys_flush(o_logunit)
    end if
 
-
-   n = 0
    do iblock = 1, nblocks_clinic
       this_block = get_block(blocks_clinic(iblock),iblock)
-      if (dbug > 1) then
+
+      if (dbug > 1) then !----- optional debug info -----
          write(o_logunit,'(2a,i3)'    ) subName,"iblock = ",iblock
          write(o_logunit,'(2a,2e12.3)') subName,"orig  min/max PT_RESTORE_RTAU = ",minval(PT_RESTORE_RTAU     (:,:  ,iblock)  ) &
                                                                                   ,maxval(PT_RESTORE_RTAU     (:,:  ,iblock)  )
-         write(o_logunit,'(2a,2e12.3)') subName,"orig  min/max PT_INTERIOR_DATA= ",minval(PT_INTERIOR_DATA    (:,:,1,iblock,1)) &
-                                                                                  ,maxval(PT_INTERIOR_DATA    (:,:,1,iblock,1))
-         write(o_logunit,'(2a,2i12  )') subName,"orig  min/max PT_RESTORE_MAX_L= ",minval(PT_RESTORE_MAX_LEVEL(:,:  ,iblock  )) &
-                                                                                  ,maxval(PT_RESTORE_MAX_LEVEL(:,:  ,iblock  ))
          write(o_logunit,'(2a,2e12.3)') subName,"orig  min/max  S_RESTORE_RTAU = ",minval( S_RESTORE_RTAU     (:,:  ,iblock)  ) &
                                                                                   ,maxval( S_RESTORE_RTAU     (:,:  ,iblock)  )
-         write(o_logunit,'(2a,2e12.3)') subName,"orig  min/max  S_INTERIOR_DATA= ",minval( S_INTERIOR_DATA    (:,:,1,iblock,1)) &
-                                                                                  ,maxval( S_INTERIOR_DATA    (:,:,1,iblock,1))
+         write(o_logunit,'(2a,2i12  )') subName,"orig  min/max PT_RESTORE_MAX_L= ",minval(PT_RESTORE_MAX_LEVEL(:,:  ,iblock  )) &
+                                                                                  ,maxval(PT_RESTORE_MAX_LEVEL(:,:  ,iblock  ))
          write(o_logunit,'(2a,2i12  )') subName,"orig  min/max  S_RESTORE_MAX_L= ",minval( S_RESTORE_MAX_LEVEL(:,:  ,iblock  )) &
                                                                                   ,maxval( S_RESTORE_MAX_LEVEL(:,:  ,iblock  )) 
+         write(o_logunit,'(2a,2e12.3)') subName,"orig  min/max  S_INTERIOR_DATA= ",minval( S_INTERIOR_DATA    (:,:,1,iblock,1)) &
+                                                                                  ,maxval( S_INTERIOR_DATA    (:,:,1,iblock,1))
+         write(o_logunit,'(2a,2e12.3)') subName,"orig  min/max PT_INTERIOR_DATA= ",minval(PT_INTERIOR_DATA    (:,:,1,iblock,1)) &
+                                                                                  ,maxval(PT_INTERIOR_DATA    (:,:,1,iblock,1))
          call shr_sys_flush(o_logunit)
       end if
 
+      !-----------------------------------------------------------------------------------
+      ! one-time setup of restoring depth and timescale
+      !-----------------------------------------------------------------------------------
+      if (first_call) then 
+         write(o_logunit,'(2a)') subName,"first call: set restoring max levels and rtau"
 
-      do j=this_block%jb,this_block%je
-      do i=this_block%ib,this_block%ie
-         n = n + 1
+         n = 0
+         do j=this_block%jb,this_block%je
+         do i=this_block%ib,this_block%ie
+            n = n + 1
 
-         if (first_call) then !-----------------------------------------------------------
+            if (r2x_2d_p%rAttr(k_r2x_2d_frac,n) > 0.01) then ! roms data exists for this pop cell
 
-            write(o_logunit,'(2a)') subName,"first call: ID coastal points for surface restoring only"
+               !----- taper-off restoring near edge of restoring region -----
+               !----- there's probably a better way of doing this -----
+               rday =   1000       ! extremely weak
+               if (r2x_2d_p%rAttr(k_r2x_2d_wgts,n) > 0.0 ) rday = 200  ! very weak
+               if (r2x_2d_p%rAttr(k_r2x_2d_wgts,n) > 0.3 ) rday = 100
+               if (r2x_2d_p%rAttr(k_r2x_2d_wgts,n) > 0.6 ) rday =  50
+               if (r2x_2d_p%rAttr(k_r2x_2d_wgts,n) > 0.9 ) rday =  10  ! very strong
+               PT_RESTORE_RTAU(i,j,iblock) = 1.0_r8 / (  rday * 86400.0_r8)
 
-            !----- restoring timescale goes to zero near edge of restoring zone -----
-            if (r2x_2d_p%rAttr(k_r2x_2d_wgts,n) < 0.001_r8) r2x_2d_p%rAttr(k_r2x_2d_wgts,n) = c0  ! no restoring
-            rday =   10.0_r8  !   10 day - strong
-            PT_RESTORE_RTAU(i,j,iblock) =  r2x_2d_p%rAttr(k_r2x_2d_wgts   ,n) / (  rday * 86400.0)
+               !----- restoring depth limited to surface layer near coast -----
+               nCellsFromCoast = PT_RESTORE_MAX_LEVEL(i,j,iblock) ! on input max level identifies coastal cells
+               if (nCellsFromCoast < 1) then
+                  write(o_logunit,'(2a,2i6,a   )') subName,"i,j =",i,j,", land cell"
+                  PT_RESTORE_MAX_LEVEL(i,j,iblock) = 0
+               else if (nCellsFromCoast < 4) then
+                  write(o_logunit,'(2a,2i6,a,i6)') subName,"i,j =",i,j,", coastal cell, distance from coast =",nCellsFromCoast
+                  PT_RESTORE_MAX_LEVEL(i,j,iblock) = min(nCellsFromCoast,int(r2x_2d_p%rAttr(k_r2x_2d_reslev,n) ))
+                ! PT_RESTORE_MAX_LEVEL(i,j,iblock) = 1 ! limit PT restoring to surface layer only (?)
+               else
+                  write(o_logunit,'(2a,2i6,a   )') subName,"i,j =",i,j,", cells from coast > 3"
+                  PT_RESTORE_MAX_LEVEL(i,j,iblock) = max(1,int(r2x_2d_p%rAttr(k_r2x_2d_reslev,n) ))
+               end if
 
-            !----- restoring depth limited to surface layer near coast -----
-            nCellsFromCoast = PT_RESTORE_MAX_LEVEL(i,j,iblock)  ! input PT restore files needs to have this data set
-            if (nCellsFromCoast < 1) then
-               write(o_logunit,'(2a,2i6,a   )') subName,"i,j =",i,j,", land cell"
+            else ! no roms data available to restore to
+
+               rday = -1
                PT_RESTORE_MAX_LEVEL(i,j,iblock) = 0
-            else if (nCellsFromCoast <= 4) then
-               write(o_logunit,'(2a,2i6,a,i6)') subName,"i,j =",i,j,", coastal cell, distance from coast =",n
-               PT_RESTORE_MAX_LEVEL(i,j,iblock) = 1 ! limit PT to surface restoring only (?)
-            else
-               write(o_logunit,'(2a,2i6,a   )') subName,"i,j =",i,j,", cells from coast > 4"
-               PT_RESTORE_MAX_LEVEL(i,j,iblock) = max(1,int(r2x_2d_p%rAttr(k_r2x_2d_reslev,n) ))
-            end if
-            if (dbug > 1) write(o_logunit,'(2a,3i6)') subName,"max level i,j =",PT_RESTORE_MAX_LEVEL(i,j,iblock),i,j
+               PT_RESTORE_RTAU     (i,j,iblock) = 0.0_r8  ! indicates no restoring
+
+            end if ! roms data exist for the cell
+
+            !----- temporary debug/valication fields (don't commit, requires non-standard coupler) -----
+         !  o2x_o%rAttr(mct_aVect_indexRA(o2x_o,"So_rday"  ),n) = rday
+         !  o2x_o%rAttr(mct_aVect_indexRA(o2x_o,"So_rtau"  ),n) = PT_RESTORE_RTAU     (i,j,iblock)
+         !  o2x_o%rAttr(mct_aVect_indexRA(o2x_o,"So_maxlev"),n) = PT_RESTORE_MAX_LEVEL(i,j,iblock)
+         !  o2x_o%rAttr(mct_aVect_indexRA(o2x_o,"So_frac"  ),n) = r2x_2d_p%rAttr(k_r2x_2d_frac,n)
+         !  o2x_o%rAttr(mct_aVect_indexRA(o2x_o,"So_wgts"  ),n) = r2x_2d_p%rAttr(k_r2x_2d_wgts,n)
+
+            !----- for testing: turns off pop restoring -----
+            if (.false.) then 
+               PT_RESTORE_MAX_LEVEL(i,j,iblock) = 0
+               PT_RESTORE_RTAU     (i,j,iblock) = 0.0_r8
+            end if 
 
             !----- salinity gets same treatment as temperature ----- 
             S_RESTORE_RTAU     (i,j,iblock) = PT_RESTORE_RTAU     (i,j,iblock) ! use same restoring as PT
             S_RESTORE_MAX_LEVEL(i,j,iblock) = PT_RESTORE_MAX_LEVEL(i,j,iblock)
 
-            !----- flags unset data -----
-            PT_INTERIOR_DATA(i,j,k,iblock,1) = -9999.0
-             S_INTERIOR_DATA(i,j,k,iblock,1) = -8888.0
-         end if !-------------------------------------------------------------------------
+         enddo ! i
+         enddo ! j
+      end if
+      first_call = .false.
 
-         !----- use latest temperature & salinity data from roms (needs unit conversion?) -----
-      !  do k=1,PT_RESTORE_MAX_LEVEL(i,j,iblock)
-         do k=1,nLev_rp
-             PT_INTERIOR_DATA(i,j,k,iblock,1) = r2x_3d_p(k)%rAttr(k_r2x_3d_So_temp,n) - T0_kelvin
-              S_INTERIOR_DATA(i,j,k,iblock,1) = r2x_3d_p(k)%rAttr(k_r2x_3d_So_salt,n) ! * 0.001_r8
-         end do
+      !-----------------------------------------------------------------------------------
+      ! update PT & S values that pop will restore to (RTAU and MAX_LEVEL are constant)
+      !-----------------------------------------------------------------------------------
+      n = 0
+      do j=this_block%jb,this_block%je
+      do i=this_block%ib,this_block%ie
+         n = n + 1
+
+         if (r2x_2d_p%rAttr(k_r2x_2d_frac,n) > 0.01) then ! roms data exists for this pop cell
+            do k=1,PT_RESTORE_MAX_LEVEL(i,j,iblock)
+         !  do k=1,nLev_rp
+                PT_INTERIOR_DATA(i,j,k,iblock,1) = r2x_3d_p(k)%rAttr(k_r2x_3d_So_temp,n) - T0_kelvin
+                 S_INTERIOR_DATA(i,j,k,iblock,1) = r2x_3d_p(k)%rAttr(k_r2x_3d_So_salt,n) ! * 0.001_r8
+            end do
+         end if
+
       enddo ! i
       enddo ! j
 
+      !-----------------------------------------------------------------------------------
+      ! optional debug info
+      !-----------------------------------------------------------------------------------
       if (dbug > 1) then
          write(o_logunit,'(2a,2e12.3)') subName,"after min/max PT_RESTORE_RTAU = ",minval(PT_RESTORE_RTAU     (:,:  ,iblock)  ) &
                                                                                   ,maxval(PT_RESTORE_RTAU     (:,:  ,iblock)  )
-         write(o_logunit,'(2a,2e12.3)') subName,"after min/max PT_INTERIOR_DATA= ",minval(PT_INTERIOR_DATA    (:,:,1,iblock,1)) &
-                                                                                  ,maxval(PT_INTERIOR_DATA    (:,:,1,iblock,1))
-         write(o_logunit,'(2a,2i12  )') subName,"after min/max PT_RESTORE_MAX_L= ",minval(PT_RESTORE_MAX_LEVEL(:,:  ,iblock  )) &
-                                                                                  ,maxval(PT_RESTORE_MAX_LEVEL(:,:  ,iblock  ))
          write(o_logunit,'(2a,2e12.3)') subName,"after min/max  S_RESTORE_RTAU = ",minval( S_RESTORE_RTAU     (:,:  ,iblock)  ) &
                                                                                   ,maxval( S_RESTORE_RTAU     (:,:  ,iblock)  )
-         write(o_logunit,'(2a,2e12.3)') subName,"after min/max  S_INTERIOR_DATA= ",minval( S_INTERIOR_DATA    (:,:,1,iblock,1)) &
-                                                                                  ,maxval( S_INTERIOR_DATA    (:,:,1,iblock,1))
+         write(o_logunit,'(2a,2i12  )') subName,"after min/max PT_RESTORE_MAX_L= ",minval(PT_RESTORE_MAX_LEVEL(:,:  ,iblock  )) &
+                                                                                  ,maxval(PT_RESTORE_MAX_LEVEL(:,:  ,iblock  ))
          write(o_logunit,'(2a,2i12  )') subName,"after min/max  S_RESTORE_MAX_L= ",minval( S_RESTORE_MAX_LEVEL(:,:  ,iblock  )) &
                                                                                   ,maxval( S_RESTORE_MAX_LEVEL(:,:  ,iblock  ))
+         write(o_logunit,'(2a,2e12.3)') subName,"after min/max PT_INTERIOR_DATA= ",minval(PT_INTERIOR_DATA    (:,:,1,iblock,1)) &
+                                                                                  ,maxval(PT_INTERIOR_DATA    (:,:,1,iblock,1))
+         write(o_logunit,'(2a,2e12.3)') subName,"after min/max  S_INTERIOR_DATA= ",minval( S_INTERIOR_DATA    (:,:,1,iblock,1)) &
+                                                                                  ,maxval( S_INTERIOR_DATA    (:,:,1,iblock,1))
       end if
 
    enddo ! iblock
 
-   if (first_call ) first_call = .false.
+   dbug = dbug_save
 
 end subroutine ocpl_pop_import
 

@@ -32,8 +32,10 @@ module ocpl_fields_mod
    !----------------------------------------------------------------------------
    ! 2d data in support of 3d data exchange
    character(*), parameter :: ocpl_fields_r2x_2d_fields = &
-         'reslev'      &    ! max restoring level in pop      DEF
-      //':wgts'             ! merge weights ROMS+POP fields   DEF
+         'So_frac'     &    ! roms cell fraction              DEF
+      //':So_reslev'   &    ! max restoring level in pop      DEF
+      //':So_wgts'     &    ! merge weights ROMS+POP fields   DEF
+      //':So_dist'          ! merge weights ROMS+POP fields   DEF
 
    ! States
    character(*), parameter :: ocpl_fields_r2x_3d_states = &
@@ -90,8 +92,10 @@ module ocpl_fields_mod
    integer(IN) :: k_r2x_3d_So_temp
    integer(IN) :: k_r2x_3d_So_salt
 
+   integer(IN) :: k_r2x_2d_frac 
    integer(IN) :: k_r2x_2d_reslev
    integer(IN) :: k_r2x_2d_wgts
+   integer(IN) :: k_r2x_2d_dist
 
    save ! save everything
 
