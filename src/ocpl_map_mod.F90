@@ -46,8 +46,14 @@ module ocpl_map_mod
 ! !PUBLIC DATA:
 
    !--- horizontal maps (2d) ---
-   type(mct_sMatp),public :: sMatp_r2o    ! maps roms -> ocn/pop
-   type(mct_sMatp),public :: sMatp_o2r    ! maps ocn/pop -> roms
+   type(mct_sMatp),public :: sMatp_o2p    ! maps ocpl -> pop 
+   type(mct_sMatp),public :: sMatp_p2o    ! maps pop  -> ocpl
+
+   type(mct_sMatp),public :: sMatp_o2r    ! maps ocpl -> roms
+   type(mct_sMatp),public :: sMatp_r2o    ! maps roms -> ocpl
+
+   type(mct_sMatp),public :: sMatp_r2p    ! maps roms -> pop
+   type(mct_sMatp),public :: sMatp_p2r    ! maps pop  -> roms
 
 ! !PRIVATE MODULE DATA:
 
@@ -102,53 +108,88 @@ subroutine ocpl_map_init()
    write(o_logUnit,*) subname,"Init pop<->roms surface and curtain maps"
    !--------------------------------------------------------------------------------------
 
-   call shr_mct_queryConfigFile(mpicom_o,configFile,"roms2pop_file:",mapfile,"roms2pop_type:",maptype)
+   call shr_mct_queryConfigFile(mpicom_p,configFile,"roms2pop_file:",mapfile,"roms2pop_type:",maptype)
    write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
-   call shr_mct_sMatPInitnc(sMatp_r2o,gsMap_r,gsMap_o,trim(mapfile),trim(maptype),mpicom_o)
+   call shr_mct_sMatPInitnc(sMatp_r2p,gsMap_r,gsMap_p,trim(mapfile),trim(maptype),mpicom_p)
 
-   call shr_mct_queryConfigFile(mpicom_o,configFile,"pop2roms_file:",mapfile,"pop2roms_type:",maptype)
+   call shr_mct_queryConfigFile(mpicom_p,configFile,"pop2roms_file:",mapfile,"pop2roms_type:",maptype)
    write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
-   call shr_mct_sMatPInitnc(sMatp_o2r,gsMap_o,gsMap_r,trim(mapfile),trim(maptype),mpicom_o)
+   call shr_mct_sMatPInitnc(sMatp_p2r,gsMap_p,gsMap_r,trim(mapfile),trim(maptype),mpicom_p)
 
    if (do_Scurtain) then
       k = k_Scurtain
-      call shr_mct_queryConfigFile(mpicom_o,configFile, &
+      call shr_mct_queryConfigFile(mpicom_p,configFile, &
            "pop2roms_Scurtain_file:",mapfile,"pop2roms_Scurtain_type:",maptype)
       write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
-      call shr_mct_sMatPInitnc(sMatp_p2rc(k),gsMap_o,gsMap_rc(k),trim(mapfile),trim(maptype),mpicom_o)
+      call shr_mct_sMatPInitnc(sMatp_p2rc(k),gsMap_p,gsMap_rc(k),trim(mapfile),trim(maptype),mpicom_p)
    else
       write(o_logUnit,'(2a)') subname,"do_Scurtain = false" ;  call shr_sys_flush(o_logUnit)
    end if
 
    if (do_Ecurtain) then
       k = k_Ecurtain
-      call shr_mct_queryConfigFile(mpicom_o,configFile, &
+      call shr_mct_queryConfigFile(mpicom_p,configFile, &
            "pop2roms_Ecurtain_file:",mapfile,"pop2roms_Ecurtain_type:",maptype)
       write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
-      call shr_mct_sMatPInitnc(sMatp_p2rc(k),gsMap_o,gsMap_rc(k),trim(mapfile),trim(maptype),mpicom_o)
+      call shr_mct_sMatPInitnc(sMatp_p2rc(k),gsMap_p,gsMap_rc(k),trim(mapfile),trim(maptype),mpicom_p)
    else
       write(o_logUnit,'(2a)') subname,"do_Ecurtain = false" ;  call shr_sys_flush(o_logUnit)
    end if
 
    if (do_Ncurtain) then
       k = k_Ncurtain
-      call shr_mct_queryConfigFile(mpicom_o,configFile, &
+      call shr_mct_queryConfigFile(mpicom_p,configFile, &
            "pop2roms_Ncurtain_file:",mapfile,"pop2roms_Ncurtain_type:",maptype)
       write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
-      call shr_mct_sMatPInitnc(sMatp_p2rc(k),gsMap_o,gsMap_rc(k),trim(mapfile),trim(maptype),mpicom_o)
+      call shr_mct_sMatPInitnc(sMatp_p2rc(k),gsMap_p,gsMap_rc(k),trim(mapfile),trim(maptype),mpicom_p)
    else
       write(o_logUnit,'(2a)') subname,"do_Ncurtain = false" ;  call shr_sys_flush(o_logUnit)
    end if
 
    if (do_Wcurtain) then
       k = k_Wcurtain
-      call shr_mct_queryConfigFile(mpicom_o,configFile, &
+      call shr_mct_queryConfigFile(mpicom_p,configFile, &
            "pop2roms_Wcurtain_file:",mapfile,"pop2roms_Wcurtain_type:",maptype)
       write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
-      call shr_mct_sMatPInitnc(sMatp_p2rc(k),gsMap_o,gsMap_rc(k),trim(mapfile),trim(maptype),mpicom_o)
+      call shr_mct_sMatPInitnc(sMatp_p2rc(k),gsMap_p,gsMap_rc(k),trim(mapfile),trim(maptype),mpicom_p)
    else
       write(o_logUnit,'(2a)') subname,"Wcurtain = false" ;  call shr_sys_flush(o_logUnit)
    end if
+
+   !--------------------------------------------------------------------------------------
+   write(o_logUnit,*) subname,"Init ocpl<->roms surface maps" 
+   !--------------------------------------------------------------------------------------
+
+   call shr_mct_queryConfigFile(mpicom_o,configFile,"ocpl2pop_file:",mapfile,"ocpl2pop_type:",maptype)
+   write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
+   call shr_mct_sMatPInitnc(sMatp_o2p,gsMap_o,gsMap_p,trim(mapfile),trim(maptype),mpicom_o)
+
+   call shr_mct_queryConfigFile(mpicom_o,configFile,"pop2ocpl_file:",mapfile,"pop2ocpl_type:",maptype)
+   write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
+   call shr_mct_sMatPInitnc(sMatp_p2o,gsMap_p,gsMap_o,trim(mapfile),trim(maptype),mpicom_o)
+
+
+   call shr_mct_queryConfigFile(mpicom_o,configFile,"roms2ocpl_file:",mapfile,"roms2ocpl_type:",maptype)
+   write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
+   call shr_mct_sMatPInitnc(sMatp_r2o,gsMap_r,gsMap_o,trim(mapfile),trim(maptype),mpicom_o)
+
+   call shr_mct_queryConfigFile(mpicom_o,configFile,"ocpl2roms_file:",mapfile,"ocpl2roms_type:",maptype)
+   write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
+   call shr_mct_sMatPInitnc(sMatp_o2r,gsMap_o,gsMap_r,trim(mapfile),trim(maptype),mpicom_o)
+
+
+   call shr_mct_queryConfigFile(mpicom_o,configFile,"roms2pop_file:",mapfile,"roms2pop_type:",maptype)
+   write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
+   call shr_mct_sMatPInitnc(sMatp_r2p,gsMap_r,gsMap_p,trim(mapfile),trim(maptype),mpicom_o)
+
+   call shr_mct_queryConfigFile(mpicom_o,configFile,"pop2roms_file:",mapfile,"pop2roms_type:",maptype)
+   write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
+   call shr_mct_sMatPInitnc(sMatp_p2r,gsMap_p,gsMap_r,trim(mapfile),trim(maptype),mpicom_o)
+
+   !--------------------------------------------------------------------------------------
+   write(o_logUnit,*) subname,"Init ocpl<->pop  surface maps" 
+   !--------------------------------------------------------------------------------------
+   ! KLUDGE: temporarily assume ocpl has exactly pop domain & gsMap, "map" = copy 
 
    write(o_logUnit,'(2a)') subname,"Exit" ;  call shr_sys_flush(o_logUnit)
 
@@ -503,7 +544,7 @@ subroutine ocpl_map_roms2pop()
       end if
 
       !----- map merge weights: roms -> pop -----
-      call mct_sMat_avMult(r2x_2d_r, sMatp_r2o, r2x_2d_p,vector=usevector)
+      call mct_sMat_avMult(r2x_2d_r, sMatp_r2p, r2x_2d_p,vector=usevector)
 
       if (debug>0 ) then
          if ( mct_aVect_lSize(r2x_2d_p) ==  0) then  ! local tile size = 0 (not data on this PE)
@@ -620,11 +661,11 @@ subroutine ocpl_map_roms2pop()
    !--------------------------------------------------------------------------------------
    if (debug>0) write(o_logUnit,'(2a)') subname,"map 3d horizontal" ;  call shr_sys_flush(o_logUnit)
 
-   call mct_sMat_avMult(r2x_2d_r, sMatp_r2o, r2x_2d_p,vector=usevector)
+   call mct_sMat_avMult(r2x_2d_r, sMatp_r2p, r2x_2d_p,vector=usevector)
 
    do k_p = 1,nLev_rp  
       if (debug>0) write(o_logUnit,'(2a,i3)') subname,"map 3d horizontal, level=",k_p;  call shr_sys_flush(o_logUnit)
-      call mct_sMat_avMult(r2x_3d_rp(k_p), sMatp_r2o, r2x_3d_p(k_p),vector=usevector)
+      call mct_sMat_avMult(r2x_3d_rp(k_p), sMatp_r2p, r2x_3d_p(k_p),vector=usevector)
    end do 
 
 end subroutine ocpl_map_roms2pop

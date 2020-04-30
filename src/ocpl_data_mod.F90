@@ -38,8 +38,9 @@ module ocpl_data_mod
    !--------------------------------------------------------------------------------------
 
    !--- pop  output: orig & re-gridded ---
-!  type(mct_aVect)         :: x2o_p          ! pop  input: x2o_o mapped to p grid 
-!  type(mct_aVect)         :: p2x_p          ! pop ouptut 
+   type(mct_aVect)         :: x2o_p          ! pop  input: x2o_o mapped to p grid 
+   type(mct_aVect)         :: p2x_p          ! pop ouptut 
+   type(mct_aVect)         :: p2x_o          ! pop ouptut: mapped to ocpl grid
    type(mct_aVect)         :: p2x_2d_p       ! pop output: 2D fields for pop/roms coupling
    type(mct_aVect),pointer :: p2x_3d_p(:)    ! pop output: 3D fields for pop/roms coupling (level)
    type(mct_aVect),pointer :: p2x_2d_rc(:)   ! pop output: 2D fields on roms curtain (curtain)
@@ -71,19 +72,34 @@ module ocpl_data_mod
    integer(IN)             :: nlev_r         ! roms: number of levels 
 
    !--- fundamental cesm coupler & mct data structures ---
-!  type(seq_cdata), pointer :: cdata_o       ! coupler instantiates this
+   type(seq_cdata), pointer :: cdata_o       ! coupler instantiates this
+   type(seq_cdata)          :: cdata_p       ! pop/regional
    type(seq_cdata)          :: cdata_r       ! roms/regional
 
-   type(mct_gGrid), pointer :: dom_o 
-   type(mct_gGrid), target  :: dom_r
+   type(mct_gGrid), pointer :: gGrid_o      ! gGrid for ocpl (alloc'd in cpl)
+   type(mct_gGrid), target  :: gGrid_r      ! gGrid for roms (alloc'd here)
+   type(mct_gGrid), target  :: gGrid_p      ! gGrid for pop  (alloc'd here)
 
-   type(mct_gsMap), pointer :: gsMap_o      ! gsMap for pop surface
-   type(mct_gsMap), target  :: gsMap_r      ! gsMap for roms surface
-   type(mct_gsMap), pointer :: gsMap_rc(:)  ! gsMaps for four roms curtians
+   type(mct_gsMap), pointer :: gsMap_o      ! gsMap for ocpl         (alloc'd in cpl)
+   type(mct_gsMap), target  :: gsMap_p      ! gsMap for pop surface  (alloc'd here)
+   type(mct_gsMap), target  :: gsMap_r      ! gsMap for roms surface (alloc'd here)
+   type(mct_gsMap), pointer :: gsMap_rc(:)  ! gsMaps for 4 roms curtians (must alloc somewhere)
+
+   integer(IN)              :: lsize_o      ! ocpl local 1d data size
+   integer(IN)              :: lsize_p      ! pop  local 1d data size
+   integer(IN)              :: lsize_r      ! roms local 1d data size
+
+   integer(IN)              :: ni_o,nj_o    ! ocpl global 2d data size
+   integer(IN)              :: ni_p,nj_p    ! pop  global 2d data size
+   integer(IN)              :: ni_r,nj_r    ! roms global 2d data size
 
    type(seq_infodata_type), pointer :: infodata_o
    integer(IN)                      :: mpicom_o, OCNID_o ! all ocn comps share same mpi comm, ID
    character(16)                    :: name_o
+
+!  type(seq_infodata_type), target  :: infodata_p   pop shares infodata_o with pop
+   integer(IN)                      :: mpicom_p, OCNID_p
+   character(16)                    :: name_p
 
 !  type(seq_infodata_type), target  :: infodata_r   roms shares infodata_o with pop
    integer(IN)                      :: mpicom_r, OCNID_r

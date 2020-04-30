@@ -126,9 +126,6 @@ subroutine ocpl_roms_init()
 
    nlev_r = ROMS_levels(nestID)
 
-   mpicom_r = mpicom_o ! roms has same mpi comm as ocn comp
-   OCNID_r  = OCNID_o  ! roms has same comp ID  as ocn comp
-
    write(o_logunit,*) subName,"myRank   = ",MyRank
    write(o_logunit,*) subName,"nlev_r   = ",nlev_r
    write(o_logunit,*) subName,"mpicom_r = ",mpicom_r

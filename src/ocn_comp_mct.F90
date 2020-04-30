@@ -44,6 +44,7 @@ module ocn_comp_mct
    use shr_kind_mod, only: IN=>SHR_KIND_IN, R8=>SHR_KIND_R8, CS=>SHR_KIND_CS, CL=>SHR_KIND_CL
 
    use ocpl_data_mod
+   use ocpl_domain_mod
    use ocpl_map_mod
    use ocpl_pop_mod
    use ocpl_roms_mod
@@ -64,7 +65,7 @@ module ocn_comp_mct
 ! ! PRIVATE DATA:
 
    integer(IN) :: shrlogunit,shrloglev  ! to save & restore shared log units & levels
-   integer(IN) :: debug = 0             ! debug level
+   integer(IN) :: debug = 1             ! debug level
 
 !=========================================================================================
 contains
@@ -99,11 +100,14 @@ contains
    !--- local variables ---
    integer(IN) :: ioffset, joffset
    integer(IN) :: ni_o, nj_o
+   integer(IN) :: ni_p, nj_p
    integer(IN) :: ni_r, nj_r
    integer(IN) :: rc
    integer(IN) :: k       ! aVect field index 
    integer(IN) :: n       ! aVect cell index 
    integer(IN) :: lSize_o ! aVect local size of *_o grid
+   integer(IN) :: lSize_p ! aVect local size of *_p grid
+   integer(IN) :: lSize_r ! aVect local size of *_r grid
 
    logical :: restart
 
@@ -118,9 +122,24 @@ contains
    character(*), parameter :: F01 =  "( '(ocn_init_mct) ----- ',a,' ',70('-') )"
 
 !-----------------------------------------------------------------------------------------
+! Note: the seq_cdata data type contains 
+!    type seq_cdata
+!       character(len=16)                :: name               ! user defined name
+!       integer                          :: ID                 ! component id
+!       integer                          :: mpicom             ! mpi communicator
+!       type(mct_gGrid)         ,pointer :: dom => null()      ! domain info
+!       type(mct_gsMap)         ,pointer :: gsMap => null()    ! decomp info
+!       type(seq_infodata_type) ,pointer :: infodata => null() ! control flags to/from cpl
+!    end type seq_cdata
 !
+! The ocpl, pop, & roms components have own cdata_o, cdata_p, & cdata_r
+! which contain their own separate/different name, gGrid, and gsMap (comps alloc/init these)
+! but their ID & mpicom must be the same (the are all part of the same ocean component)
+! and their infodata is not only the same, but literally pointing to the same infodata data 
+! in memory (cpl allocs/inits this data type)
 !-----------------------------------------------------------------------------------------
 
+   !--- set stdout/log units ---
    call shr_file_getLogUnit (shrlogunit) ! save log unit
    call shr_file_getLogLevel(shrloglev)  ! save log level
    call seq_cdata_setptrs(cdata_o, ID=OCNID_o)
@@ -148,8 +167,8 @@ contains
    write(o_logunit,*) subName,"glob PID = ",seq_comm_gloiam(ncomp)
    write(o_logunit,*) subName,"logUnit  = ",o_logUnit
 
-   !--- Get data/pointers out of cdata ---
-   call seq_cdata_setptrs(cdata_o, ID=OCNID_o, dom=dom_o, gsMap=gsMap_o, infodata=infodata_o, mpicom=mpicom_o,name=name_o)
+   !--- Get data/pointers out of cdata_o ---
+   call seq_cdata_setptrs(cdata_o, ID=OCNID_o, dom=gGrid_o, gsMap=gsMap_o, infodata=infodata_o, mpicom=mpicom_o,name=name_o)
    write(o_logunit,*) subName, 'cdata_o ID     : ' ,  OCNID_o
    write(o_logunit,*) subName, 'cdata_o mpicom : ' ,  mpicom_o
    write(o_logunit,*) subName, 'cdata_o name   : ' // trim(name_o )
@@ -160,41 +179,110 @@ contains
    write(o_logunit,*) subName, 'start_type : ' // trim(start_type)
 
    !--------------------------------------------------------------------------------------
-   ! call pop initialize phase
+   ! init ocpl/ocn gsMap and domain
    !--------------------------------------------------------------------------------------
+   write(o_logunit,F01) "ocpl_domain_init call" ; call shr_sys_flush(o_logunit)
+   call ocpl_domain_init() 
+   write(o_logunit,F01) "ocpl_domain_init return" ; call shr_sys_flush(o_logunit)
+   call seq_infodata_GetData(infodata_o, ocn_nx = ni_o, ocn_ny = nj_o)
+
+   !--- init x2o_o & o2x_o (now that domain is initialized so we know lsize) ---
+   lsize_o = mct_gsMap_lsize(gsMap_o, mpicom_o)
+   call mct_aVect_init(x2o_o, rList=seq_flds_x2o_fields, lsize=lsize_o)
+   call mct_aVect_zero(x2o_o)
+   write(o_logunit,'(2a,2i6)') subname,'<DEBUG> x2o_o lsize, nflds = ',lsize_o,mct_aVect_nRAttr(x2o_o)
+   call mct_aVect_init(o2x_o, rList=seq_flds_o2x_fields, lsize=lsize_o)
+   call mct_aVect_zero(o2x_o)
+   write(o_logunit,'(2a,2i6)') subname,'<DEBUG> o2x_o lsize, nflds = ',lsize_o,mct_aVect_nRAttr(o2x_o)
+
+   !--- sanity check on some data ---
+   call seq_cdata_setptrs(cdata_o, ID=OCNID_o, mpicom=mpicom_o,name=name_o)
+   write(o_logunit,'(3a    )') subName,'cdata_o name       = ' ,trim(name_o )
+   write(o_logunit,'(2a,2i5)') subName,'cdata_o ID         = ' ,OCNID_o
+   write(o_logunit,'(2a,2i5)') subName,'cdata_o mpicom     = ' ,mpicom_o
+   write(o_logunit,'(2a,2i5)') subName,'ni_o,nj_o          = ' ,ni_o,nj_o
+   write(o_logunit,'(2a,2i5)') subname,'x2o_o lsize, nflds = ' ,mct_aVect_lsize(x2o_o),mct_aVect_nRAttr(x2o_o)
+   write(o_logunit,'(2a,2i5)') subname,'o2x_o lsize, nflds = ' ,mct_aVect_lsize(o2x_o),mct_aVect_nRAttr(o2x_o)
+
+   !--------------------------------------------------------------------------------------
+   ! call pop  initialize phase -- note: ocpl, roms & pop share ID, mpicom & infodata
+   !--------------------------------------------------------------------------------------
+
+   !--- init cdata_p --- contains ID,mpicom,infdodata,gGrid,gsMap 
+   OCNID_p = OCNID_o  
+   call seq_cdata_init(cdata_p, ID=OCNID_p, dom=gGrid_p, gsMap=gsMap_p, infodata=infodata_o, name='POP')
+   call seq_cdata_setptrs(cdata_p, mpicom=mpicom_p) ! seq_cdata_init sets mpicom based on ID
+   !  --- alternative to calling seq_cdata_setptrs ---
+   !  mpicom_p = mpicom_o
+   !  cdata_p%name      =  "POP"
+   !  cdata_p%ID        =  OCNID_p
+   !  cdata_p%mpicom    =  mpicom_p
+   !  cdata_p%dom       => gGrid_p
+   !  cdata_p%gsmap     => gsMap_p
+   !  cdata_p%ginfodata => infodata_o
 
    !--- initialize pop --
    write(o_logunit,F01) "pop_init_mct call" ; call shr_sys_flush(o_logunit)
-   call pop_init_mct( EClock, cdata_o, x2o_o, o2x_o, NLFilename )
+   call pop_init_mct( EClock, cdata_p, x2o_p, p2x_p, NLFilename ) 
    write(o_logunit,F01) "pop_init_mct return" ; call shr_sys_flush(o_logunit)
    call seq_timemgr_EClockGetData( EClock, curr_ymd=ymd, curr_tod=tod )
-   write(o_logunit,*) subname,'ymd, tod =',ymd,tod
+   write(o_logunit,*) subname,'pop  ymd, tod =',ymd,tod
 
-   call seq_infodata_GetData(infodata_o, ocn_nx = ni_o, ocn_ny = nj_o)
+   !--- restore ocpl/ocn dims in infodata, were changed to pop dims by pop_init_mct() ---
+   call seq_infodata_GetData(infodata_o, ocn_nx = ni_p, ocn_ny = nj_p)
+   call seq_infodata_PutData(infodata_o, ocn_nx = ni_o, ocn_ny = nj_o) ! restore ocpl dims
+
+   !--- init aVect for pop output on ocpl/ocn grid ----
+   lsize_o = mct_aVect_lsize(o2x_o) 
+   call mct_aVect_init(p2x_o, p2x_p, lsize=lsize_o)
+   call mct_aVect_zero(p2x_o)
+   write(o_logunit,'(2a,2i6)') subname,'<DEBUG> p2x_o lsize, nflds = ',mct_aVect_lsize(p2x_o),mct_aVect_nRAttr(p2x_o)
+
+   !--- sanity check on some data ---
+   call seq_cdata_setptrs(cdata_p, ID=OCNID_p, mpicom=mpicom_p,name=name_p)
+   write(o_logunit,'(3a    )') subName,'cdata_p name       = ' ,trim(name_p )
+   write(o_logunit,'(2a,2i5)') subName,'cdata_p ID         = ' ,OCNID_p
+   write(o_logunit,'(2a,2i5)') subName,'cdata_p mpicom     = ' ,mpicom_p
+   write(o_logunit,'(2a,2i5)') subName,'ni_p,nj_p          = ' ,ni_p,nj_p
+   write(o_logunit,'(2a,2i5)') subname,'x2o_p lsize, nflds = ' ,mct_aVect_lsize(x2o_p),mct_aVect_nRAttr(x2o_p)
+   write(o_logunit,'(2a,2i5)') subname,'p2x_p lsize, nflds = ' ,mct_aVect_lsize(p2x_p),mct_aVect_nRAttr(p2x_p)
+   write(o_logunit,'(2a,2i5)') subname,'p2x_o lsize, nflds = ' ,mct_aVect_lsize(p2x_o),mct_aVect_nRAttr(p2x_o)
+
 
    !--------------------------------------------------------------------------------------
-   ! call roms initialize phase
+   ! call roms initialize phase -- note: ocpl, roms & pop share ID, mpicom & infodata
    !--------------------------------------------------------------------------------------
 
-   !--- set data, and assign pointers, inside cdata_r --- pop & roms share ID,mpicom,infdodata
-   call seq_cdata_init(cdata_r, ID=OCNID_o, dom=dom_r, gsMap=gsMap_r, infodata=infodata_o, name='ROMS')
+   !--- init cdata_p --- contains ID,mpicom,infdodata,gGrid,gsMap 
+   OCNID_r = OCNID_o  
+   call seq_cdata_init(cdata_r, ID=OCNID_r, dom=gGrid_r, gsMap=gsMap_r, infodata=infodata_o, name='ROMS')
+   call seq_cdata_setptrs(cdata_r, mpicom=mpicom_r) ! seq_cdata_init sets mpicom based on ID
 
    !--- initialize roms ---
    write(o_logunit,F01) "roms_init_mct call" ; call shr_sys_flush(o_logunit)
    call roms_init_mct( EClock, cdata_r, x2o_r, r2x_r)  ! , NLFilename )
    write(o_logunit,F01) "roms_init_mct return" ; call shr_sys_flush(o_logunit)
    call seq_timemgr_EClockGetData( EClock, curr_ymd=ymd, curr_tod=tod )
-   write(o_logunit,*) subname,'ymd, tod =',ymd,tod
+   write(o_logunit,*) subname,'roms ymd, tod =',ymd,tod
 
-   !--- restore pop dims in infodata, were changed to regional dims by roms_init_mct() ---
-   call seq_infodata_GetData(infodata_o, ocn_nx = ni_r, ocn_ny = nj_r)
-   call seq_infodata_PutData(infodata_o, ocn_nx = ni_o, ocn_ny = nj_o)
+   !--- restore ocpl dims in infodata, were changed to regional dims by roms_init_mct() ---
+   call seq_infodata_GetData(infodata_o, ocn_nx = ni_r, ocn_ny = nj_r) ! get roms dims
+   call seq_infodata_PutData(infodata_o, ocn_nx = ni_o, ocn_ny = nj_o) ! restore ocpl dims
 
-   !--- init aVect for roms output on ocean grid ----
+   !--- init aVect for roms output on ocpl grid ----
    lsize_o = mct_aVect_lsize(o2x_o)
    call mct_aVect_init(r2x_o, r2x_r, lsize=lsize_o)
    call mct_aVect_zero(r2x_o)
-   write(o_logunit,'(2a,2i6)') subname,'<DEBUG> r2x_o lsize, nflds = ',mct_aVect_lsize(r2x_o),mct_aVect_nRAttr(r2x_o)
+
+   !--- sanity check on some data ---
+   call seq_cdata_setptrs(cdata_r, ID=OCNID_r, mpicom=mpicom_r,name=name_r)
+   write(o_logunit,'(3a    )') subName,'cdata_r name       = ' ,trim(name_r )
+   write(o_logunit,'(2a,2i5)') subName,'cdata_r ID         = ' ,OCNID_r
+   write(o_logunit,'(2a,2i5)') subName,'cdata_r mpicom     = ' ,mpicom_r
+   write(o_logunit,'(2a,2i5)') subName,'ni_r,nj_r          = ' ,ni_r,nj_r
+   write(o_logunit,'(2a,2i5)') subname,'x2o_r lsize, nflds = ' ,mct_aVect_lsize(x2o_r),mct_aVect_nRAttr(x2o_r)
+   write(o_logunit,'(2a,2i5)') subname,'r2x_r lsize, nflds = ' ,mct_aVect_lsize(r2x_r),mct_aVect_nRAttr(r2x_r)
+   write(o_logunit,'(2a,2i5)') subname,'r2x_o lsize, nflds = ' ,mct_aVect_lsize(r2x_o),mct_aVect_nRAttr(r2x_o)
 
    !--------------------------------------------------------------------------------------
    ! init additional data-types needed for ocpl's 3d global/regional ocean coupling 
@@ -207,41 +295,33 @@ contains
    call ocpl_roms_init()
 
    !--------------------------------------------------------------------------------------
-   ! sanity check on some data
-   !--------------------------------------------------------------------------------------
-   call seq_cdata_setptrs(cdata_o, ID=OCNID_o,                    mpicom=mpicom_o,name=name_o)
-   write(o_logunit,*) subName, 'cdata_o ID     : ' ,  OCNID_o
-   write(o_logunit,*) subName, 'cdata_o mpicom : ' ,  mpicom_o
-   write(o_logunit,*) subName, 'cdata_o name   : ' // trim(name_o )
-   write(o_logunit,*) subName, 'ni_o,nj_o      : ' ,  ni_o,nj_o
-   call seq_cdata_setptrs(cdata_r, ID=OCNID_r,                    mpicom=mpicom_r,name=name_r)
-   write(o_logunit,*) subName, 'cdata_r ID     : ' ,  OCNID_r
-   write(o_logunit,*) subName, 'cdata_r mpicom : ' ,  mpicom_r
-   write(o_logunit,*) subName, 'cdata_r name   : ' // trim(name_r )
-   write(o_logunit,*) subName, 'ni_r,nj_r      : ' ,  ni_r,nj_r
-
-   !--------------------------------------------------------------------------------------
    ! init all maps (surface, 3d, curtain)
    !--------------------------------------------------------------------------------------
    write(o_logunit,*) subName, "initialize all maps..."
    call ocpl_map_init()
 
-   !----------------------------------------------------------------------------
-   ! merge roms output into pop output (coupler will receive this merged data)
-   !----------------------------------------------------------------------------
-   write(o_logunit,*) subname,"map: r2x_r -> r2x_o & merge roms & pop output"
+   !--------------------------------------------------------------------------------------
+   ! map & merge pop & roms output to create ocpl output
+   !--------------------------------------------------------------------------------------
+   write(o_logunit,'(2a)') subname,"map: r2x_r -> r2x_o"
    call mct_sMat_avMult(r2x_r, sMatp_r2o, r2x_o,vector=usevector)
 
+   write(o_logunit,'(2a)') subname,"map: p2x_p -> p2x_o"
+   call mct_sMat_avMult(p2x_p, sMatp_p2o, p2x_o,vector=usevector)
+
    if (debug > 0) then
-      k = mct_avect_indexra(o2x_o,'So_t')
+      k = mct_avect_indexra(r2x_o,'So_t')
       write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max r2x_r SST = ',minval(r2x_r%rAttr(k,:)),maxval(r2x_r%rAttr(k,:))
       write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max r2x_o SST = ',minval(r2x_o%rAttr(k,:)),maxval(r2x_o%rAttr(k,:))
-      write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max o2x_o SST = ',minval(o2x_o%rAttr(k,:)),maxval(o2x_o%rAttr(k,:))
+      write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max p2x_p SST = ',minval(p2x_p%rAttr(k,:)),maxval(p2x_p%rAttr(k,:))
+      write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max o2x_o SST = ',minval(p2x_o%rAttr(k,:)),maxval(p2x_o%rAttr(k,:))
    end if
 
+   write(o_logunit,'(a)') subname,"merge: r2x_o -> o2x_o"
    k = mct_avect_indexra(o2x_o,'So_t')
    lsize_o = mct_aVect_lsize( o2x_o )
    do n=1,lsize_o
+      o2x_o%rAttr(:,n) = p2x_o%rAttr(:,n)  ! start with all pop data, replace some with roms data
       if (r2x_o%rAttr(k,n) > 1.0) then  ! has data mapped from roms (unmapped cells have sst = 0)
           o2x_o%rAttr(:,n) = r2x_o%rAttr(:,n)  ! merge all fields
       !   o2x_o%rAttr(k,n) = r2x_o%rAttr(k,n)  ! merge SST only
@@ -253,7 +333,9 @@ contains
       write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max o2x_o SST+ = ',minval(o2x_o%rAttr(k,:)),maxval(o2x_o%rAttr(k,:))
    end if
 
-
+   !--------------------------------------------------------------------------------------
+   ! done
+   !--------------------------------------------------------------------------------------
    write(o_logunit,F00) "EXIT" ; call shr_sys_flush(o_logunit)
 
    !--- Reset shr logging to original values ---
@@ -334,14 +416,20 @@ contains
    ! import data into pop (pop 3d restoring)
    !----------------------------------------------------------------------------
    write(o_logunit,F01) "import ocean coupling fields into pop (3d restoring)" ; call shr_sys_flush(o_logunit)
-   call ocpl_pop_import( )
-   !all ocpl_pop_import(o2x_o ) ! for debugging pop restoring
+!  call ocpl_pop_import( )
+   call ocpl_pop_import(o2x_o ) ! for debugging pop restoring
+
+   !----------------------------------------------------------------------------
+   ! map: ocpl -> pop
+   !----------------------------------------------------------------------------
+   write(o_logunit,'(2a)') subname,"map: x2o_o -> x2o_p"
+   call mct_sMat_avMult(x2o_o, sMatp_o2p, x2o_p,vector=usevector)
 
    !----------------------------------------------------------------------------
    ! run pop
    !----------------------------------------------------------------------------
    write(o_logunit,F01) "call pop_run_mct"
-   call pop_run_mct( EClock, cdata_o, x2o_o, o2x_o)
+   call pop_run_mct( EClock, cdata_p, x2o_p, p2x_p)
 
    !----------------------------------------------------------------------------
    ! export data from pop (roms lateral BCs)
@@ -377,28 +465,32 @@ contains
    write(o_logunit,F01) "call roms_run_mct"
    call roms_run_mct( EClock, cdata_r, x2o_r, r2x_r)
 
-   !----------------------------------------------------------------------------
-   ! merge roms output into pop output (coupler will receive this merged data)
-   !----------------------------------------------------------------------------
-   write(o_logunit,*) subname,"map: r2x_r -> r2x_o & merge roms & pop output"
+
+   !--------------------------------------------------------------------------------------
+   ! map & merge pop & roms output to create ocpl output
+   !--------------------------------------------------------------------------------------
+   write(o_logunit,'(2a)') subname,"map: r2x_r -> r2x_o"
    call mct_sMat_avMult(r2x_r, sMatp_r2o, r2x_o,vector=usevector)
 
+   write(o_logunit,'(2a)') subname,"map: p2x_p -> p2x_o"
+   call mct_sMat_avMult(p2x_p, sMatp_p2o, p2x_o,vector=usevector)
+
    if (debug > 0) then
-      k = mct_avect_indexra(o2x_o,'So_t')
+      k = mct_avect_indexra(r2x_o,'So_t')
       write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max r2x_r SST = ',minval(r2x_r%rAttr(k,:)),maxval(r2x_r%rAttr(k,:))
       write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max r2x_o SST = ',minval(r2x_o%rAttr(k,:)),maxval(r2x_o%rAttr(k,:))
-      write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max o2x_o SST = ',minval(o2x_o%rAttr(k,:)),maxval(o2x_o%rAttr(k,:))
+      write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max p2x_p SST = ',minval(p2x_p%rAttr(k,:)),maxval(p2x_p%rAttr(k,:))
+      write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max o2x_o SST = ',minval(p2x_o%rAttr(k,:)),maxval(p2x_o%rAttr(k,:))
    end if
 
+   write(o_logunit,'(a)') subname,"merge: r2x_o -> o2x_o"
    k = mct_avect_indexra(o2x_o,'So_t')
    lsize_o = mct_aVect_lsize( o2x_o )
    do n=1,lsize_o
-   !  if (r2x_o%rAttr(k,n) > 1.0) then  ! has data mapped from roms (unmapped cells have sst = 0)
-      if (r2x_2d_p%rAttr(k_r2x_2d_frac,n) > 0.01) then ! has data mapped from roms
-      !   o2x_o%rAttr(:,n) = r2x_o%rAttr(:,n)  ! merge all fields
-      !   o2x_o%rAttr(k,n) = r2x_o%rAttr(k,n)  ! merge SST only  DEBUG: doesn't merge/clobber additional debug fields
-          o2x_o%rAttr(k,n) = (1.0_r8 - r2x_2d_p%rAttr(k_r2x_2d_frac,n))*o2x_o%rAttr(k,n) &
-                           +           r2x_2d_p%rAttr(k_r2x_2d_frac,n) *r2x_o%rAttr(k,n)
+      o2x_o%rAttr(:,n) = p2x_o%rAttr(:,n)  ! start with all pop data, replace some with roms data
+      if (r2x_o%rAttr(k,n) > 1.0) then  ! has data mapped from roms (unmapped cells have sst = 0)
+          o2x_o%rAttr(:,n) = r2x_o%rAttr(:,n)  ! merge all fields
+      !   o2x_o%rAttr(k,n) = r2x_o%rAttr(k,n)  ! merge SST only
       end if
    end do
 
@@ -407,6 +499,9 @@ contains
       write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max o2x_o SST+ = ',minval(o2x_o%rAttr(k,:)),maxval(o2x_o%rAttr(k,:))
    end if
 
+   !--------------------------------------------------------------------------------------
+   ! done
+   !--------------------------------------------------------------------------------------
 !  call timer_stop(timer_total)
 
 #if (defined _MEMTRACE)

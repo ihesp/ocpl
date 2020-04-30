@@ -219,8 +219,8 @@ end subroutine ocpl_pop_init
 !
 ! !INTERFACE: ----------------------------------------------------------------------------
 
-!ubroutine ocpl_pop_import(o2x_o)   ! o2x_o used to put temporary debug fields onto cpl history file
-subroutine ocpl_pop_import()
+subroutine ocpl_pop_import(p2x_p)   ! p2x_p used to put temporary debug fields onto cpl history file
+!ubroutine ocpl_pop_import()
 
    use blocks
    use forcing_pt_interior, only: PT_INTERIOR_DATA     ! alter interal pop data for 2-way coupling
@@ -232,7 +232,7 @@ subroutine ocpl_pop_import()
 
 ! !INPUT/OUTPUT PARAMETERS:
 
-!  type(mct_aVect)             , intent(inout) :: o2x_o   
+   type(mct_aVect)             , intent(inout) :: p2x_p   
 
 !EOP
 !BOC
@@ -337,17 +337,11 @@ subroutine ocpl_pop_import()
             end if ! roms data exist for the cell
 
             !----- temporary debug/valication fields (don't commit, requires non-standard coupler) -----
-         !  o2x_o%rAttr(mct_aVect_indexRA(o2x_o,"So_rday"  ),n) = rday
-         !  o2x_o%rAttr(mct_aVect_indexRA(o2x_o,"So_rtau"  ),n) = PT_RESTORE_RTAU     (i,j,iblock)
-         !  o2x_o%rAttr(mct_aVect_indexRA(o2x_o,"So_maxlev"),n) = PT_RESTORE_MAX_LEVEL(i,j,iblock)
-         !  o2x_o%rAttr(mct_aVect_indexRA(o2x_o,"So_frac"  ),n) = r2x_2d_p%rAttr(k_r2x_2d_frac,n)
-         !  o2x_o%rAttr(mct_aVect_indexRA(o2x_o,"So_wgts"  ),n) = r2x_2d_p%rAttr(k_r2x_2d_wgts,n)
-
-            !----- for testing: turns off pop restoring -----
-            if (.false.) then 
-               PT_RESTORE_MAX_LEVEL(i,j,iblock) = 0
-               PT_RESTORE_RTAU     (i,j,iblock) = 0.0_r8
-            end if 
+            p2x_p%rAttr(mct_aVect_indexRA(p2x_p,"So_rday"  ),n) = rday
+            p2x_p%rAttr(mct_aVect_indexRA(p2x_p,"So_rtau"  ),n) = PT_RESTORE_RTAU     (i,j,iblock)
+            p2x_p%rAttr(mct_aVect_indexRA(p2x_p,"So_maxlev"),n) = PT_RESTORE_MAX_LEVEL(i,j,iblock)
+            p2x_p%rAttr(mct_aVect_indexRA(p2x_p,"So_frac"  ),n) = r2x_2d_p%rAttr(k_r2x_2d_frac,n)
+            p2x_p%rAttr(mct_aVect_indexRA(p2x_p,"So_wgts"  ),n) = r2x_2d_p%rAttr(k_r2x_2d_wgts,n)
 
             !----- salinity gets same treatment as temperature ----- 
             S_RESTORE_RTAU     (i,j,iblock) = PT_RESTORE_RTAU     (i,j,iblock) ! use same restoring as PT
@@ -355,6 +349,14 @@ subroutine ocpl_pop_import()
 
          enddo ! i
          enddo ! j
+
+         !----- for testing: turns off pop restoring -----
+         if (.false.) then 
+            write(o_logunit,'(2a)') subName,"DEBUG: pop restoring DEACTIVATED"
+            PT_RESTORE_MAX_LEVEL(:,:,iblock) = 0
+            PT_RESTORE_RTAU     (:,:,iblock) = 0.0_r8
+         end if 
+
       end if
       first_call = .false.
 
@@ -492,16 +494,16 @@ subroutine ocpl_pop_export( p2x_2d_p, p2x_3d_p)
 
    !--- DEBUG ---
    if (dbug > 0) then
-      !--- Note: tentitively gsMap_o is the pop gsMap and gsMap_p doesn't exist ---
-      call mct_aVect_gather(p2x_2d_p, global_p, gsMap_o, master_task, mpicom_o, ier)
+      !--- Note: tentitively gsMap_p is the pop gsMap and gsMap_p doesn't exist ---
+      call mct_aVect_gather(p2x_2d_p, global_p, gsMap_p, master_task, mpicom_p, ier)
 
-      if (seq_comm_iamroot(OCNID_o)) then
+      if (seq_comm_iamroot(OCNID_p)) then
         lsize = mct_aVect_lsize(global_p)
         write(o_logunit,'(2a,i7)') subname,"global lsize = ",lsize
         write(o_logunit,'(2a,i7)') subname,"Note: vertical columns filled from above"
       end if
 
-      if (seq_comm_iamroot(OCNID_o)) then
+      if (seq_comm_iamroot(OCNID_p)) then
          k = k_p2x_2d_So_ssh
          x_min =  1.0e30
          x_max = -1.0e30
@@ -514,8 +516,8 @@ subroutine ocpl_pop_export( p2x_2d_p, p2x_3d_p)
          write(o_logunit,'(2a,2es11.3)') subname,"global  ssh  min,max: ",x_min,x_max
       end if
 
-      call mct_aVect_gather(p2x_3d_p(1), global_p, gsMap_o, master_task, mpicom_o, ier)
-      if (seq_comm_iamroot(OCNID_o)) then
+      call mct_aVect_gather(p2x_3d_p(1), global_p, gsMap_p, master_task, mpicom_p, ier)
+      if (seq_comm_iamroot(OCNID_p)) then
          k = k_p2x_3d_So_temp
          !---------------------
          x_min =  1.0e30
@@ -528,8 +530,8 @@ subroutine ocpl_pop_export( p2x_2d_p, p2x_3d_p)
          end do
          write(o_logunit,'(2a,2es11.3)') subname,"global  sst  min,max: ",x_min,x_max
       end if
-      call mct_aVect_gather(p2x_3d_p(9), global_p, gsMap_o, master_task, mpicom_o, ier)
-      if (seq_comm_iamroot(OCNID_o)) then
+      call mct_aVect_gather(p2x_3d_p(9), global_p, gsMap_p, master_task, mpicom_p, ier)
+      if (seq_comm_iamroot(OCNID_p)) then
          k = k_p2x_3d_So_temp
          !---------------------
          x_min =  1.0e30
