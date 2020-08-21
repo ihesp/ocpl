@@ -4,7 +4,7 @@ module ocpl_pop_mod
 !=========================================================================================
 
 !BOP
-! !MODULE: pop_comp_mct
+! !MODULE: ocpl_pop_mod
 ! 
 ! !INTERFACE:
 
@@ -153,7 +153,10 @@ subroutine ocpl_pop_init( p2x_p, p2x_2d_p, p2x_3d_p)
    write(o_logunit,'(2a)') subname,"Enter"
 
    nlev_p = km
+   lsize = mct_gsMap_lsize(gsMap_p, mpicom_p)
+   write(o_logunit,'(2a,i4)') subName," gsMap_p lsize = ",lsize 
    lsize = mct_aVect_lsize( p2x_p )
+   write(o_logunit,'(2a,i4)') subName,"     lsize     = ",lsize 
 
    !----- init 2d fields specifically for pop/roms coupling -----
    call mct_aVect_init(p2x_2d_p, rList=ocpl_fields_p2x_2d_fields,lsize=lsize)
@@ -171,9 +174,10 @@ subroutine ocpl_pop_init( p2x_p, p2x_2d_p, p2x_3d_p)
    enddo
 
    !----- init 3d,2d fields specifically for roms->pop coupling -----
-   write(o_logunit,'(2a,i4)') subName,"     nlev_rp    = ",nlev_rp
    call mct_aVect_init(r2x_2d_p, rList=ocpl_fields_r2x_2d_fields, lsize=lsize)
    call mct_aVect_zero(r2x_2d_p)
+
+   write(o_logunit,'(2a,i4)') subName,"     nlev_rp   = ",nlev_rp
    allocate(r2x_3d_p(nlev_rp))
    do k = 1, nlev_rp
       call mct_aVect_init(r2x_3d_p(k), rList=ocpl_fields_r2x_3d_fields,lsize=lsize)
@@ -251,7 +255,7 @@ subroutine ocpl_pop_import(p2x_p)   ! p2x_p used to put temporary debug fields o
 !-----------------------------------------------------------------------------------------
 
    dbug_save = dbug ! debug this routine (only?)
-   dbug = 2
+   if (first_call) dbug = 2
 
    if (dbug > 0) write(o_logunit,'(2a)') subName,"Enter" ; call shr_sys_flush(o_logunit)
 

@@ -190,19 +190,18 @@ contains
    lsize_o = mct_gsMap_lsize(gsMap_o, mpicom_o)
    call mct_aVect_init(x2o_o, rList=seq_flds_x2o_fields, lsize=lsize_o)
    call mct_aVect_zero(x2o_o)
-   write(o_logunit,'(2a,2i6)') subname,'<DEBUG> x2o_o lsize, nflds = ',lsize_o,mct_aVect_nRAttr(x2o_o)
    call mct_aVect_init(o2x_o, rList=seq_flds_o2x_fields, lsize=lsize_o)
    call mct_aVect_zero(o2x_o)
-   write(o_logunit,'(2a,2i6)') subname,'<DEBUG> o2x_o lsize, nflds = ',lsize_o,mct_aVect_nRAttr(o2x_o)
 
    !--- sanity check on some data ---
    call seq_cdata_setptrs(cdata_o, ID=OCNID_o, mpicom=mpicom_o,name=name_o)
    write(o_logunit,'(3a    )') subName,'cdata_o name       = ' ,trim(name_o )
    write(o_logunit,'(2a,2i5)') subName,'cdata_o ID         = ' ,OCNID_o
    write(o_logunit,'(2a,2i5)') subName,'cdata_o mpicom     = ' ,mpicom_o
-   write(o_logunit,'(2a,2i5)') subName,'ni_o,nj_o          = ' ,ni_o,nj_o
-   write(o_logunit,'(2a,2i5)') subname,'x2o_o lsize, nflds = ' ,mct_aVect_lsize(x2o_o),mct_aVect_nRAttr(x2o_o)
-   write(o_logunit,'(2a,2i5)') subname,'o2x_o lsize, nflds = ' ,mct_aVect_lsize(o2x_o),mct_aVect_nRAttr(o2x_o)
+   write(o_logunit,'(2a,2i7)') subName,'ni_o,nj_o          = ' ,ni_o,nj_o
+   write(o_logunit,'(2a,2i7)') subname,'x2o_o lsize, nflds = ' ,mct_aVect_lsize(x2o_o),mct_aVect_nRAttr(x2o_o)
+   write(o_logunit,'(2a,2i7)') subname,'o2x_o lsize, nflds = ' ,mct_aVect_lsize(o2x_o),mct_aVect_nRAttr(o2x_o)
+   write(o_logunit,'(2a,2i7)') subname,'gsMap_o lsize      = ' , mct_gsMap_lsize(gsMap_o, mpicom_o)
 
    !--------------------------------------------------------------------------------------
    ! call pop  initialize phase -- note: ocpl, roms & pop share ID, mpicom & infodata
@@ -236,7 +235,6 @@ contains
    lsize_o = mct_aVect_lsize(o2x_o) 
    call mct_aVect_init(p2x_o, p2x_p, lsize=lsize_o)
    call mct_aVect_zero(p2x_o)
-   write(o_logunit,'(2a,2i6)') subname,'<DEBUG> p2x_o lsize, nflds = ',mct_aVect_lsize(p2x_o),mct_aVect_nRAttr(p2x_o)
 
    !--- sanity check on some data ---
    call seq_cdata_setptrs(cdata_p, ID=OCNID_p, mpicom=mpicom_p,name=name_p)
@@ -244,10 +242,10 @@ contains
    write(o_logunit,'(2a,2i5)') subName,'cdata_p ID         = ' ,OCNID_p
    write(o_logunit,'(2a,2i5)') subName,'cdata_p mpicom     = ' ,mpicom_p
    write(o_logunit,'(2a,2i5)') subName,'ni_p,nj_p          = ' ,ni_p,nj_p
-   write(o_logunit,'(2a,2i5)') subname,'x2o_p lsize, nflds = ' ,mct_aVect_lsize(x2o_p),mct_aVect_nRAttr(x2o_p)
-   write(o_logunit,'(2a,2i5)') subname,'p2x_p lsize, nflds = ' ,mct_aVect_lsize(p2x_p),mct_aVect_nRAttr(p2x_p)
-   write(o_logunit,'(2a,2i5)') subname,'p2x_o lsize, nflds = ' ,mct_aVect_lsize(p2x_o),mct_aVect_nRAttr(p2x_o)
-
+   write(o_logunit,'(2a,2i7)') subname,'x2o_p lsize, nflds = ' ,mct_aVect_lsize(x2o_p),mct_aVect_nRAttr(x2o_p)
+   write(o_logunit,'(2a,2i7)') subname,'p2x_p lsize, nflds = ' ,mct_aVect_lsize(p2x_p),mct_aVect_nRAttr(p2x_p)
+   write(o_logunit,'(2a,2i7)') subname,'p2x_o lsize, nflds = ' ,mct_aVect_lsize(p2x_o),mct_aVect_nRAttr(p2x_o)
+   write(o_logunit,'(2a,2i7)') subname,'gsMap_p lsize      = ' , mct_gsMap_lsize(gsMap_p, mpicom_p)
 
    !--------------------------------------------------------------------------------------
    ! call roms initialize phase -- note: ocpl, roms & pop share ID, mpicom & infodata
@@ -280,16 +278,17 @@ contains
    write(o_logunit,'(2a,2i5)') subName,'cdata_r ID         = ' ,OCNID_r
    write(o_logunit,'(2a,2i5)') subName,'cdata_r mpicom     = ' ,mpicom_r
    write(o_logunit,'(2a,2i5)') subName,'ni_r,nj_r          = ' ,ni_r,nj_r
-   write(o_logunit,'(2a,2i5)') subname,'x2o_r lsize, nflds = ' ,mct_aVect_lsize(x2o_r),mct_aVect_nRAttr(x2o_r)
-   write(o_logunit,'(2a,2i5)') subname,'r2x_r lsize, nflds = ' ,mct_aVect_lsize(r2x_r),mct_aVect_nRAttr(r2x_r)
-   write(o_logunit,'(2a,2i5)') subname,'r2x_o lsize, nflds = ' ,mct_aVect_lsize(r2x_o),mct_aVect_nRAttr(r2x_o)
+   write(o_logunit,'(2a,2i7)') subname,'x2o_r lsize, nflds = ' ,mct_aVect_lsize(x2o_r),mct_aVect_nRAttr(x2o_r)
+   write(o_logunit,'(2a,2i7)') subname,'r2x_r lsize, nflds = ' ,mct_aVect_lsize(r2x_r),mct_aVect_nRAttr(r2x_r)
+   write(o_logunit,'(2a,2i7)') subname,'r2x_o lsize, nflds = ' ,mct_aVect_lsize(r2x_o),mct_aVect_nRAttr(r2x_o)
+   write(o_logunit,'(2a,2i7)') subname,'gsMap_r lsize      = ' , mct_gsMap_lsize(gsMap_r, mpicom_r)
 
    !--------------------------------------------------------------------------------------
    ! init additional data-types needed for ocpl's 3d global/regional ocean coupling 
    !--------------------------------------------------------------------------------------
    
    write(o_logunit,F01) "call ocpl_pop_init"  ; call shr_sys_flush(o_logunit)
-   call ocpl_pop_init( o2x_o, p2x_2d_p, p2x_3d_p)
+   call ocpl_pop_init( p2x_p, p2x_2d_p, p2x_3d_p)
 
    write(o_logunit,F01) "call ocpl_roms_init" ; call shr_sys_flush(o_logunit)
    call ocpl_roms_init()
@@ -417,7 +416,7 @@ contains
    !----------------------------------------------------------------------------
    write(o_logunit,F01) "import ocean coupling fields into pop (3d restoring)" ; call shr_sys_flush(o_logunit)
 !  call ocpl_pop_import( )
-   call ocpl_pop_import(o2x_o ) ! for debugging pop restoring
+   call ocpl_pop_import(p2x_p ) ! adds non-standard fields to validate/debug pop restoring
 
    !----------------------------------------------------------------------------
    ! map: ocpl -> pop
@@ -435,7 +434,7 @@ contains
    ! export data from pop (roms lateral BCs)
    !----------------------------------------------------------------------------
    write(o_logunit,F01) "export ocean coupling fields from pop (roms lateral BCs)" ; call shr_sys_flush(o_logunit)
-   call ocpl_pop_export( p2x_2d_p, p2x_3d_p)
+   call ocpl_pop_export( p2x_2d_p, p2x_3d_p)    ! to do?  remove args as aVects are in ocpl_data_mod
 
    !----------------------------------------------------------------------------
    ! map: pop -> roms  (roms lateral BCs)

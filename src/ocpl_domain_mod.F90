@@ -85,7 +85,7 @@ subroutine ocpl_domain_init()
 
    integer(IN)             :: nk_o  ! depth, assumed to be 1 
    character(*), parameter :: decomp   = "2d1d"
-   character(*), parameter :: fileName = "/glade/p/cesm/cseg/inputdata/share/domains/domain.ocn.gx1v7.151008.nc"
+   character(*), parameter :: fileName = "/glade/p/cesm/cseg/inputdata/share/domains/domain.ocn.gom09_gx1v7.200610.nc"
    character(*), parameter ::  latName = "yc"
    character(*), parameter ::  lonName = "xc"
    character(*), parameter :: maskName = "mask"

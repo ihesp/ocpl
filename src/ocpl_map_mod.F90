@@ -57,8 +57,7 @@ module ocpl_map_mod
 
 ! !PRIVATE MODULE DATA:
 
-!  integer(IN),parameter :: debug  = 0    ! debug level
-   integer(IN)           :: debug  = 0    ! debug level
+   integer(IN),parameter :: debug  = 0    ! debug level
    integer(IN),parameter :: nestID = 1    ! roms nest (grid/domain) #1 
 
    type(mct_sMatp)       :: sMatp_p2rc(4) ! curtain amps: pop -> roms (4-curtains: S,E,N,W)
@@ -105,16 +104,8 @@ subroutine ocpl_map_init()
    write(o_logUnit,'(2a,i2)') subname,"debug level = ",debug
 
    !--------------------------------------------------------------------------------------
-   write(o_logUnit,*) subname,"Init pop<->roms surface and curtain maps"
+   write(o_logUnit,*) subname,"Init pop<->roms curtain maps"
    !--------------------------------------------------------------------------------------
-
-   call shr_mct_queryConfigFile(mpicom_p,configFile,"roms2pop_file:",mapfile,"roms2pop_type:",maptype)
-   write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
-   call shr_mct_sMatPInitnc(sMatp_r2p,gsMap_r,gsMap_p,trim(mapfile),trim(maptype),mpicom_p)
-
-   call shr_mct_queryConfigFile(mpicom_p,configFile,"pop2roms_file:",mapfile,"pop2roms_type:",maptype)
-   write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
-   call shr_mct_sMatPInitnc(sMatp_p2r,gsMap_p,gsMap_r,trim(mapfile),trim(maptype),mpicom_p)
 
    if (do_Scurtain) then
       k = k_Scurtain
@@ -157,7 +148,7 @@ subroutine ocpl_map_init()
    end if
 
    !--------------------------------------------------------------------------------------
-   write(o_logUnit,*) subname,"Init ocpl<->roms surface maps" 
+   write(o_logUnit,*) subname,"Init ocpl<->pop  surface maps" 
    !--------------------------------------------------------------------------------------
 
    call shr_mct_queryConfigFile(mpicom_o,configFile,"ocpl2pop_file:",mapfile,"ocpl2pop_type:",maptype)
@@ -168,6 +159,9 @@ subroutine ocpl_map_init()
    write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
    call shr_mct_sMatPInitnc(sMatp_p2o,gsMap_p,gsMap_o,trim(mapfile),trim(maptype),mpicom_o)
 
+   !--------------------------------------------------------------------------------------
+   write(o_logUnit,*) subname,"Init ocpl<->roms surface maps" 
+   !--------------------------------------------------------------------------------------
 
    call shr_mct_queryConfigFile(mpicom_o,configFile,"roms2ocpl_file:",mapfile,"roms2ocpl_type:",maptype)
    write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
@@ -177,6 +171,9 @@ subroutine ocpl_map_init()
    write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
    call shr_mct_sMatPInitnc(sMatp_o2r,gsMap_o,gsMap_r,trim(mapfile),trim(maptype),mpicom_o)
 
+   !--------------------------------------------------------------------------------------
+   write(o_logUnit,*) subname,"Init pop<->roms surface maps" 
+   !--------------------------------------------------------------------------------------
 
    call shr_mct_queryConfigFile(mpicom_o,configFile,"roms2pop_file:",mapfile,"roms2pop_type:",maptype)
    write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
@@ -185,11 +182,6 @@ subroutine ocpl_map_init()
    call shr_mct_queryConfigFile(mpicom_o,configFile,"pop2roms_file:",mapfile,"pop2roms_type:",maptype)
    write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
    call shr_mct_sMatPInitnc(sMatp_p2r,gsMap_p,gsMap_r,trim(mapfile),trim(maptype),mpicom_o)
-
-   !--------------------------------------------------------------------------------------
-   write(o_logUnit,*) subname,"Init ocpl<->pop  surface maps" 
-   !--------------------------------------------------------------------------------------
-   ! KLUDGE: temporarily assume ocpl has exactly pop domain & gsMap, "map" = copy 
 
    write(o_logUnit,'(2a)') subname,"Exit" ;  call shr_sys_flush(o_logUnit)
 
@@ -527,12 +519,12 @@ subroutine ocpl_map_roms2pop()
             i = mod(n-1,localISize) + iMin
             j = n/localISize        + jMin     ! requires/assumes fortran truncation
 
-            !---- kludge: ramp to zero over 40 cells adjacent to boundary, need !a better algorithm
+            !---- kludge: ramp to zero over 10 cells adjacent to boundary, need a better algorithm
             diff = 1.0_r8
-            if (abs(i-LBi)<40) diff = min(diff,abs(i-LBi)/40.0_r8)
-            if (abs(i-UBi)<40) diff = min(diff,abs(i-UBi)/40.0_r8)
-            if (abs(j-LBj)<40) diff = min(diff,abs(j-LBj)/40.0_r8)
-            if (abs(j-UBj)<40) diff = min(diff,abs(j-UBj)/40.0_r8)
+            if (abs(i-LBi)<24) diff = min(diff,abs(i-LBi)/24.0_r8)
+            if (abs(i-UBi)<24) diff = min(diff,abs(i-UBi)/24.0_r8)
+            if (abs(j-LBj)<12) diff = min(diff,abs(j-LBj)/12.0_r8)
+            if (abs(j-UBj)<12) diff = min(diff,abs(j-UBj)/12.0_r8)
             r2x_2d_r%rAttr(k_r2x_2d_wgts,n) = diff
          end do
          if (debug>0 ) then
@@ -544,6 +536,7 @@ subroutine ocpl_map_roms2pop()
       end if
 
       !----- map merge weights: roms -> pop -----
+      write(o_logUnit,'(2a)') subname,"map merge weights: roms -> pop" ;  call shr_sys_flush(o_logUnit)
       call mct_sMat_avMult(r2x_2d_r, sMatp_r2p, r2x_2d_p,vector=usevector)
 
       if (debug>0 ) then
@@ -570,6 +563,7 @@ subroutine ocpl_map_roms2pop()
    ! o for pop,  z_p(k) units of depth are cm and are all positive numbers
    ! o for roms, z_r(k) units of depth are  m and are all negative numbers
    !--------------------------------------------------------------------------------------
+   if (debug>0) write(o_logUnit,'(2a,5i5)') subName,"DEBUG: vertical interp"
 
 !  alternate looping option
 !  do j = jMin,jMax  ! j wrt roms(i,j)   ! loop over roms(i,j) and compute aVect(n)
