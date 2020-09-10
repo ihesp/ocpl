@@ -195,7 +195,6 @@ subroutine ocpl_roms_init()
    BOUNDARY_OCPL(nestID) % bypass     = .true.  ! tell roms NOT to use this data
    BOUNDARY_OCPL(nestID) % newdata    = .false. ! tell roms this data has NOT been updated
    BOUNDARY_OCPL(nestID) % debug      = debug   ! debug level for write statements
-   BOUNDARY_OCPL(nestID) % debug      = 2       ! debug level for write statements
 
    BOUNDARY_OCPL(nestID) % zeta_west  = 1.0e30
    BOUNDARY_OCPL(nestID) % zeta_east  = 1.0e30
@@ -261,7 +260,7 @@ end subroutine ocpl_roms_init
 
 !=========================================================================================
 ! !DESCRIPTION:
-!    put lateral BCs into roms
+!    get 3D fields out of roms
 !
 ! !INTERFACE:
 !
@@ -355,7 +354,10 @@ subroutine ocpl_roms_import()
 
 ! !INPUT/OUTPUT PARAMETERS:
 
-      USE mod_boundary ! internal roms data structures
+   USE mod_boundary ! internal roms data structures
+   use mod_grid    , only: ROMS_GRID => GRID     ! roms internal data
+   use mod_parallel, only: MyRank                ! roms internal data
+
 !EOP
 !BOC
 
@@ -375,6 +377,11 @@ subroutine ocpl_roms_import()
    real(R8)    :: tmin,tmax                ! min/max value of field
    logical     :: first_call = .true.      ! flags one-time initializations
 
+   integer(IN) :: lsize                    ! local tile size
+   real(R8)    :: ubar  ,vbar              ! vertically integrated velocities
+   real(R8)    :: dz                       ! thickness of one cell
+   real(R8)    :: udepth,vdepth            ! vertically integrated depth
+
    character(*), parameter :: subName = "(ocpl_roms_import) "
 
 !-------------------------------------------------------------------------------
@@ -384,6 +391,57 @@ subroutine ocpl_roms_import()
 
    write(o_logunit,'(2a)') subname,"Enter" ;  call shr_sys_flush(o_logunit)
    if (debug>0) write(o_logunit,'(2a,i3)') subName,"debug level = ",debug
+
+   !--------------------------------------------------------------------------------------
+   ! re-compute ubar & vbar by vertical integration of u & v (on decomposed grid)
+   !--------------------------------------------------------------------------------------
+
+   do k=1,4 ! four curtains: N,E,S,W
+
+      if  ((k==k_Scurtain .and. do_Scurtain==.true.) &
+      .or. (k==k_Ecurtain .and. do_Ecurtain==.true.) &
+      .or. (k==k_Ncurtain .and. do_Ncurtain==.true.) &
+      .or. (k==k_Wcurtain .and. do_Wcurtain==.true.) ) then
+
+         lsize = mct_aVect_lsize (p2x_3d_rc(k,1))
+         if (lsize > 0) then !--- non-zero local aVect size ---
+            do ij=1,lsize ! for each roms grid BC cell
+
+               !--- determine roms' global i,j indicies ---
+               if (k == k_Wcurtain) then        ! 
+                  i = 1
+                  j = ij + BOUNDS(nestID)%JstrR(MyRank) - 1
+               else if (k == k_Ncurtain) then
+                  i = ij + BOUNDS(nestID)%IstrR(MyRank) - 1
+                  j = globalJSize0(nestID) + 1
+               else if (k == k_Ecurtain) then
+                  i = globalISize0(nestID) + 1
+                  j = ij + BOUNDS(nestID)%JstrR(MyRank) - 1
+               else if (k == k_Scurtain) then
+                  i = ij + BOUNDS(nestID)%IstrR(MyRank) - 1
+                  j = 1
+               endif
+
+               ubar   = 0.0_R8
+               vbar   = 0.0_R8
+               udepth = 0.0_R8
+               vdepth = 0.0_R8
+               do n=1,nlev_r !--- vertical integration ---
+                  dz = (ROMS_GRID(nestID)%Hz(i,j,n) + ROMS_GRID(nestID)%Hz(i-1,j,n) )/2.0_R8
+                  ubar   = ubar   + dz*p2x_3d_rc(k,n)%rAttr(k_p2x_3d_So_uvel,ij)
+                  udepth = udepth + dz
+                  dz = (ROMS_GRID(nestID)%Hz(i,j,n) + ROMS_GRID(nestID)%Hz(i,j-1,n) )/2.0_R8
+                  vbar   = vbar   + dz*p2x_3d_rc(k,n)%rAttr(k_p2x_3d_So_vvel,ij)
+                  vdepth = vdepth + dz
+               end do 
+               p2x_2d_rc(k)%rAttr(k_p2x_2d_So_ubar,ij) = ubar/udepth
+               p2x_2d_rc(k)%rAttr(k_p2x_2d_So_vbar,ij) = vbar/vdepth
+
+            end do ! do ij - loop over roms grid cells
+
+         end if ! lsize > 0
+      end if ! curtain is active
+   end do  ! do k=1,4  ~ over all four curtains: N,E,S,W
 
   !-----------------------------------------------------------------------------
   ! create global (not decomposed/distributed) curtain aVects
