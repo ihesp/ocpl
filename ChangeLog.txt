@@ -1,3 +1,11 @@
+Tag name: master_201211
+Originator(s): kauff
+Date: 2020 Dec 12
+One-line Summary: works with composit grid
+
+used in C_OC.g09g17_g09g17.02 -- 2020-Sep composite grid, clean 2-year run for
+BAMS paper
+
 ================================================================================
 Tag name: master_191211
 Originator(s): kauff
