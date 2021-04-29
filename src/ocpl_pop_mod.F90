@@ -247,6 +247,7 @@ subroutine ocpl_pop_import(p2x_p)   ! p2x_p used to put temporary debug fields o
    real(r8)                :: rday ! restoring time-scale
    real(r8)                :: frac ! roms cell fraction mapped to pop grid
    logical                 :: first_call = .true.
+   logical                 :: pop_restoring  = .true. ! normally true, false ocption for DEBUGing
    integer(IN)             :: dbug_save
    character(*), parameter :: subName = "(ocpl_pop_import) "
 
@@ -276,6 +277,9 @@ subroutine ocpl_pop_import(p2x_p)   ! p2x_p used to put temporary debug fields o
       call shr_sys_flush(o_logunit)
    end if
 
+   if (first_call) write(o_logunit,'(2a,L2)') subName,"pop 3d restoring = ",pop_restoring
+
+   if (pop_restoring) then 
    do iblock = 1, nblocks_clinic
       this_block = get_block(blocks_clinic(iblock),iblock)
 
@@ -362,7 +366,6 @@ subroutine ocpl_pop_import(p2x_p)   ! p2x_p used to put temporary debug fields o
          end if 
 
       end if
-      first_call = .false.
 
       !-----------------------------------------------------------------------------------
       ! update PT & S values that pop will restore to (RTAU and MAX_LEVEL are constant)
@@ -402,6 +405,9 @@ subroutine ocpl_pop_import(p2x_p)   ! p2x_p used to put temporary debug fields o
       end if
 
    enddo ! iblock
+   end if ! pop_restoring
+
+   first_call = .false.
 
    dbug = dbug_save
 
