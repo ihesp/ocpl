@@ -560,6 +560,7 @@ subroutine ocpl_roms_import()
       BOUNDARY_OCPL(nestID) % newdata    = .true.
    end if
    if ( do_Wcurtain) then
+      k = k_Wcurtain
       do j  = 0, globalJSize0(nestID) + 1   ! 0-based roms internal data
          ij = j + 1                         ! 1-based aVect 
          BOUNDARY_OCPL(nestID) % zeta_west (j) = roms2D_BC(k)%rAttr(k_p2x_2d_So_ssh ,ij) *0.01_r8
