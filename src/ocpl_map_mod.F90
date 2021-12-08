@@ -519,12 +519,12 @@ subroutine ocpl_map_roms2pop()
             i = mod(n-1,localISize) + iMin
             j = n/localISize        + jMin     ! requires/assumes fortran truncation
 
-            !---- kludge: ramp to zero over 10 cells adjacent to boundary, need a better algorithm
+            !---- kludge: ramp to zero over 3 cells adjacent to boundary (gs03tx13 grid), need a better algorithm
             diff = 1.0_r8
-            if (abs(i-LBi)<24) diff = min(diff,abs(i-LBi)/24.0_r8)
-            if (abs(i-UBi)<24) diff = min(diff,abs(i-UBi)/24.0_r8)
-            if (abs(j-LBj)<12) diff = min(diff,abs(j-LBj)/12.0_r8)
-            if (abs(j-UBj)<12) diff = min(diff,abs(j-UBj)/12.0_r8)
+            if (abs(i-LBi)<10) diff = min(diff,abs(i-LBi)/10.0_r8)
+            if (abs(i-UBi)<10) diff = min(diff,abs(i-UBi)/10.0_r8)
+            if (abs(j-LBj)<10) diff = min(diff,abs(j-LBj)/10.0_r8)
+            if (abs(j-UBj)<10) diff = min(diff,abs(j-UBj)/10.0_r8)
             r2x_2d_r%rAttr(k_r2x_2d_wgts,n) = diff
          end do
          if (debug>0 ) then

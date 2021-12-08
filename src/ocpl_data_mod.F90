@@ -54,7 +54,7 @@ module ocpl_data_mod
    logical,parameter :: do_Scurtain = .true.  ! true => roms needs BCs for south curtain
    logical,parameter :: do_Ecurtain = .true.  ! true => roms needs BCs for  east curtain
    logical,parameter :: do_Ncurtain = .true.  ! true => roms needs BCs for north curtain
-   logical,parameter :: do_Wcurtain = .false. ! true => roms needs BCs for  west curtain
+   logical,parameter :: do_Wcurtain = .true.  ! true => roms needs BCs for  west curtain
 
    !--- roms output: orig & re-gridded ---
    type(mct_aVect)         :: x2o_r          ! roms  input: x2o_o mapped to r grid 
