@@ -87,7 +87,7 @@ subroutine ocpl_domain_init()
    character(*), parameter :: decomp   = "2d1d"
 !  HACK/TO-DO: fileName, at least, should be an input namelist param -- BK
 !  character(*), parameter :: fileName = "/glade/p/cesm/cseg/inputdata/share/domains/domain.ocn.gom09_gx1v7.200610.nc"
-   character(*), parameter :: fileName = "/glade/p/cesm/cseg/inputdata/share/domains/domain.ocn.gst03_tx0.1v3.210108.nc"
+   character(*), parameter :: fileName = "/glade/p/cesm/cseg/inputdata/share/domains/domain.ocn.gst03_tx0.1v3.210514.nc"
    character(*), parameter ::  latName = "yc"
    character(*), parameter ::  lonName = "xc"
    character(*), parameter :: maskName = "mask"
