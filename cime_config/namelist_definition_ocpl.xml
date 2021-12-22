@@ -9,15 +9,97 @@
       Currently ocpl doesn't need any namelist input
   -->
 
-  <entry id="foobar">
-    <type>real</type>
+  <entry id="domainfile">
+    <type>char</type>
     <category>ocpl</category>
     <group>ocpl_nml</group>
     <desc>
-      not needed, just an example of a namelist variable
+      ocpl domain file
     </desc>
     <values>
-      <value>123.4</value>
+      <value>/glade/p/cesm/cseg/inputdata/share/domains/domain.ocn.gst03_tx0.1v3.210514.nc</value>
+    </values>
+  </entry>
+  <entry id="latname">
+    <type>char</type>
+    <category>ocpl</category>
+    <group>ocpl_nml</group>
+    <desc>
+      ocpl domain file latitude variable name
+    </desc>
+    <values>
+      <value>yc</value>
+    </values>
+  </entry>
+
+  <entry id="lonname">
+    <type>char</type>
+    <category>ocpl</category>
+    <group>ocpl_nml</group>
+    <desc>
+      ocpl domain file longitude variable name
+    </desc>
+    <values>
+      <value>xc</value>
+    </values>
+  </entry>
+  <entry id="maskname">
+    <type>char</type>
+    <category>ocpl</category>
+    <group>ocpl_nml</group>
+    <desc>
+      ocpl domain file mask variable name
+    </desc>
+    <values>
+      <value>mask</value>
+    </values>
+  </entry>
+
+  <entry id="areaname">
+    <type>char</type>
+    <category>ocpl</category>
+    <group>ocpl_nml</group>
+    <desc>
+      ocpl domain file area variable name
+    </desc>
+    <values>
+      <value>area</value>
+    </values>
+  </entry>
+
+  <entry id="fracname">
+    <type>char</type>
+    <category>ocpl</category>
+    <group>ocpl_nml</group>
+    <desc>
+      ocpl domain file land fraction variable name
+    </desc>
+    <values>
+      <value>frac</value>
+    </values>
+  </entry>
+
+  <entry id="decomp">
+    <type>char</type>
+    <category>ocpl</category>
+    <group>ocpl_nml</group>
+    <desc>
+      ocpl decomp type
+    </desc>
+    <values>
+      <value>2d1d</value>
+    </values>
+  </entry>
+
+  <entry id="readfrac">
+    <type>logical</type>
+    <category>ocpl</category>
+    <group>ocpl_nml</group>
+    <desc>
+      ocpl 
+    </desc>
+    <values>
+      <value>False</value>
     </values>
   </entry>
 
