@@ -39,7 +39,6 @@ module ocn_comp_mct
 
    use shr_file_mod 
    use shr_cal_mod,       only : shr_cal_date2ymd
-   use shr_sys_mod,       only : shr_sys_flush
    use shr_mpi_mod,       only : shr_mpi_bcast
    use shr_kind_mod, only: IN=>SHR_KIND_IN, R8=>SHR_KIND_R8, CS=>SHR_KIND_CS, CL=>SHR_KIND_CL
 
@@ -160,30 +159,37 @@ contains
    pop_logUnit  = o_logUnit              ! set pop    logUnit = ocpl's logUnit
    roms_logUnit = o_logUnit              ! set roms   logUnit = ocpl's logUnit
 
-   write(o_logunit,F00) " ENTER"
    ncomp = OCNID(1)
-   write(o_logunit,*) subName,"comp  ID = ",                ncomp
-   write(o_logunit,*) subName,"comp PID = ",seq_comm_iam   (ncomp)
-   write(o_logunit,*) subName,"glob PID = ",seq_comm_gloiam(ncomp)
-   write(o_logunit,*) subName,"logUnit  = ",o_logUnit
-
+   if (seq_comm_iamroot(OCNID_o)) then       ! set logUnit to ocn.log.*
+      write(o_logunit,F00) " ENTER"
+      write(o_logunit,*) subName,"comp  ID = ",                ncomp
+      write(o_logunit,*) subName,"comp PID = ",seq_comm_iam   (ncomp)
+      write(o_logunit,*) subName,"glob PID = ",seq_comm_gloiam(ncomp)
+      write(o_logunit,*) subName,"logUnit  = ",o_logUnit
+   endif
    !--- Get data/pointers out of cdata_o ---
    call seq_cdata_setptrs(cdata_o, ID=OCNID_o, dom=gGrid_o, gsMap=gsMap_o, infodata=infodata_o, mpicom=mpicom_o,name=name_o)
-   write(o_logunit,*) subName, 'cdata_o ID     : ' ,  OCNID_o
-   write(o_logunit,*) subName, 'cdata_o mpicom : ' ,  mpicom_o
-   write(o_logunit,*) subName, 'cdata_o name   : ' // trim(name_o )
 
+   if (seq_comm_iamroot(OCNID_o)) then       ! set logUnit to ocn.log.*
+      write(o_logunit,*) subName, 'cdata_o ID     : ' ,  OCNID_o
+      write(o_logunit,*) subName, 'cdata_o mpicom : ' ,  mpicom_o
+      write(o_logunit,*) subName, 'cdata_o name   : ' // trim(name_o )
+   endif
    !--- Get data out of infodata ---
    call seq_infodata_GetData(infodata_o, case_name=case_name, start_type=start_type)
-   write(o_logunit,*) subName, 'case_name  : ' // trim(case_name )
-   write(o_logunit,*) subName, 'start_type : ' // trim(start_type)
+   if (seq_comm_iamroot(OCNID_o)) then       ! set logUnit to ocn.log.*
+      write(o_logunit,*) subName, 'case_name  : ' // trim(case_name )
+      write(o_logunit,*) subName, 'start_type : ' // trim(start_type)
 
    !--------------------------------------------------------------------------------------
    ! init ocpl/ocn gsMap and domain
    !--------------------------------------------------------------------------------------
-   write(o_logunit,F01) "ocpl_domain_init call" ; call shr_sys_flush(o_logunit)
+      write(o_logunit,F01) "ocpl_domain_init call"
+   endif
    call ocpl_domain_init() 
-   write(o_logunit,F01) "ocpl_domain_init return" ; call shr_sys_flush(o_logunit)
+   if (seq_comm_iamroot(OCNID_o)) then       ! set logUnit to ocn.log.*
+      write(o_logunit,F01) "ocpl_domain_init return"
+   endif
    call seq_infodata_GetData(infodata_o, ocn_nx = ni_o, ocn_ny = nj_o)
 
    !--- init x2o_o & o2x_o (now that domain is initialized so we know lsize) ---
@@ -195,14 +201,15 @@ contains
 
    !--- sanity check on some data ---
    call seq_cdata_setptrs(cdata_o, ID=OCNID_o, mpicom=mpicom_o,name=name_o)
-   write(o_logunit,'(3a    )') subName,'cdata_o name       = ' ,trim(name_o )
-   write(o_logunit,'(2a,2i5)') subName,'cdata_o ID         = ' ,OCNID_o
-   write(o_logunit,'(2a,2i5)') subName,'cdata_o mpicom     = ' ,mpicom_o
-   write(o_logunit,'(2a,2i7)') subName,'ni_o,nj_o          = ' ,ni_o,nj_o
-   write(o_logunit,'(2a,2i7)') subname,'x2o_o lsize, nflds = ' ,mct_aVect_lsize(x2o_o),mct_aVect_nRAttr(x2o_o)
-   write(o_logunit,'(2a,2i7)') subname,'o2x_o lsize, nflds = ' ,mct_aVect_lsize(o2x_o),mct_aVect_nRAttr(o2x_o)
-   write(o_logunit,'(2a,2i7)') subname,'gsMap_o lsize      = ' , mct_gsMap_lsize(gsMap_o, mpicom_o)
-
+   if (seq_comm_iamroot(OCNID_o)) then       ! set logUnit to ocn.log.*
+      write(o_logunit,'(3a    )') subName,'cdata_o name       = ' ,trim(name_o )
+      write(o_logunit,'(2a,2i5)') subName,'cdata_o ID         = ' ,OCNID_o
+      write(o_logunit,'(2a,2i5)') subName,'cdata_o mpicom     = ' ,mpicom_o
+      write(o_logunit,'(2a,2i7)') subName,'ni_o,nj_o          = ' ,ni_o,nj_o
+      write(o_logunit,'(2a,2i7)') subname,'x2o_o lsize, nflds = ' ,mct_aVect_lsize(x2o_o),mct_aVect_nRAttr(x2o_o)
+      write(o_logunit,'(2a,2i7)') subname,'o2x_o lsize, nflds = ' ,mct_aVect_lsize(o2x_o),mct_aVect_nRAttr(o2x_o)
+      write(o_logunit,'(2a,2i7)') subname,'gsMap_o lsize      = ' , mct_gsMap_lsize(gsMap_o, mpicom_o)
+   endif
    !--------------------------------------------------------------------------------------
    ! call pop  initialize phase -- note: ocpl, roms & pop share ID, mpicom & infodata
    !--------------------------------------------------------------------------------------
@@ -221,11 +228,13 @@ contains
    !  cdata_p%ginfodata => infodata_o
 
    !--- initialize pop --
-   write(o_logunit,F01) "pop_init_mct call" ; call shr_sys_flush(o_logunit)
+   if (seq_comm_iamroot(OCNID_o)) then       ! set logUnit to ocn.log.*
+      write(o_logunit,F01) "pop_init_mct call" 
+   endif
    call pop_init_mct( EClock, cdata_p, x2o_p, p2x_p, NLFilename ) 
-   write(o_logunit,F01) "pop_init_mct return" ; call shr_sys_flush(o_logunit)
+   if (seq_comm_iamroot(OCNID_o)) write(o_logunit,F01) "pop_init_mct return" 
    call seq_timemgr_EClockGetData( EClock, curr_ymd=ymd, curr_tod=tod )
-   write(o_logunit,*) subname,'pop  ymd, tod =',ymd,tod
+   if (seq_comm_iamroot(OCNID_o)) write(o_logunit,*) subname,'pop  ymd, tod =',ymd,tod
 
    !--- restore ocpl/ocn dims in infodata, were changed to pop dims by pop_init_mct() ---
    call seq_infodata_GetData(infodata_o, ocn_nx = ni_p, ocn_ny = nj_p)
@@ -238,15 +247,16 @@ contains
 
    !--- sanity check on some data ---
    call seq_cdata_setptrs(cdata_p, ID=OCNID_p, mpicom=mpicom_p,name=name_p)
-   write(o_logunit,'(3a    )') subName,'cdata_p name       = ' ,trim(name_p )
-   write(o_logunit,'(2a,2i5)') subName,'cdata_p ID         = ' ,OCNID_p
-   write(o_logunit,'(2a,2i5)') subName,'cdata_p mpicom     = ' ,mpicom_p
-   write(o_logunit,'(2a,2i5)') subName,'ni_p,nj_p          = ' ,ni_p,nj_p
-   write(o_logunit,'(2a,2i7)') subname,'x2o_p lsize, nflds = ' ,mct_aVect_lsize(x2o_p),mct_aVect_nRAttr(x2o_p)
-   write(o_logunit,'(2a,2i7)') subname,'p2x_p lsize, nflds = ' ,mct_aVect_lsize(p2x_p),mct_aVect_nRAttr(p2x_p)
-   write(o_logunit,'(2a,2i7)') subname,'p2x_o lsize, nflds = ' ,mct_aVect_lsize(p2x_o),mct_aVect_nRAttr(p2x_o)
-   write(o_logunit,'(2a,2i7)') subname,'gsMap_p lsize      = ' , mct_gsMap_lsize(gsMap_p, mpicom_p)
-
+   if (seq_comm_iamroot(OCNID_o)) then       ! set logUnit to ocn.log.*
+      write(o_logunit,'(3a    )') subName,'cdata_p name       = ' ,trim(name_p )
+      write(o_logunit,'(2a,2i5)') subName,'cdata_p ID         = ' ,OCNID_p
+      write(o_logunit,'(2a,2i5)') subName,'cdata_p mpicom     = ' ,mpicom_p
+      write(o_logunit,'(2a,2i5)') subName,'ni_p,nj_p          = ' ,ni_p,nj_p
+      write(o_logunit,'(2a,2i7)') subname,'x2o_p lsize, nflds = ' ,mct_aVect_lsize(x2o_p),mct_aVect_nRAttr(x2o_p)
+      write(o_logunit,'(2a,2i7)') subname,'p2x_p lsize, nflds = ' ,mct_aVect_lsize(p2x_p),mct_aVect_nRAttr(p2x_p)
+      write(o_logunit,'(2a,2i7)') subname,'p2x_o lsize, nflds = ' ,mct_aVect_lsize(p2x_o),mct_aVect_nRAttr(p2x_o)
+      write(o_logunit,'(2a,2i7)') subname,'gsMap_p lsize      = ' , mct_gsMap_lsize(gsMap_p, mpicom_p)
+   endif
    !--------------------------------------------------------------------------------------
    ! call roms initialize phase -- note: ocpl, roms & pop share ID, mpicom & infodata
    !--------------------------------------------------------------------------------------
@@ -257,11 +267,11 @@ contains
    call seq_cdata_setptrs(cdata_r, mpicom=mpicom_r) ! seq_cdata_init sets mpicom based on ID
 
    !--- initialize roms ---
-   write(o_logunit,F01) "roms_init_mct call" ; call shr_sys_flush(o_logunit)
+   if (seq_comm_iamroot(OCNID_o)) write(o_logunit,F01) "roms_init_mct call" 
    call roms_init_mct( EClock, cdata_r, x2o_r, r2x_r)  ! , NLFilename )
-   write(o_logunit,F01) "roms_init_mct return" ; call shr_sys_flush(o_logunit)
+   if (seq_comm_iamroot(OCNID_o)) write(o_logunit,F01) "roms_init_mct return" 
    call seq_timemgr_EClockGetData( EClock, curr_ymd=ymd, curr_tod=tod )
-   write(o_logunit,*) subname,'roms ymd, tod =',ymd,tod
+   if (seq_comm_iamroot(OCNID_o)) write(o_logunit,*) subname,'roms ymd, tod =',ymd,tod
 
    !--- restore ocpl dims in infodata, were changed to regional dims by roms_init_mct() ---
    call seq_infodata_GetData(infodata_o, ocn_nx = ni_r, ocn_ny = nj_r) ! get roms dims
@@ -274,38 +284,39 @@ contains
 
    !--- sanity check on some data ---
    call seq_cdata_setptrs(cdata_r, ID=OCNID_r, mpicom=mpicom_r,name=name_r)
-   write(o_logunit,'(3a    )') subName,'cdata_r name       = ' ,trim(name_r )
-   write(o_logunit,'(2a,2i5)') subName,'cdata_r ID         = ' ,OCNID_r
-   write(o_logunit,'(2a,2i5)') subName,'cdata_r mpicom     = ' ,mpicom_r
-   write(o_logunit,'(2a,2i5)') subName,'ni_r,nj_r          = ' ,ni_r,nj_r
-   write(o_logunit,'(2a,2i7)') subname,'x2o_r lsize, nflds = ' ,mct_aVect_lsize(x2o_r),mct_aVect_nRAttr(x2o_r)
-   write(o_logunit,'(2a,2i7)') subname,'r2x_r lsize, nflds = ' ,mct_aVect_lsize(r2x_r),mct_aVect_nRAttr(r2x_r)
-   write(o_logunit,'(2a,2i7)') subname,'r2x_o lsize, nflds = ' ,mct_aVect_lsize(r2x_o),mct_aVect_nRAttr(r2x_o)
-   write(o_logunit,'(2a,2i7)') subname,'gsMap_r lsize      = ' , mct_gsMap_lsize(gsMap_r, mpicom_r)
-
+   if (seq_comm_iamroot(OCNID_o)) then       ! set logUnit to ocn.log.*
+      write(o_logunit,'(3a    )') subName,'cdata_r name       = ' ,trim(name_r )
+      write(o_logunit,'(2a,2i5)') subName,'cdata_r ID         = ' ,OCNID_r
+      write(o_logunit,'(2a,2i5)') subName,'cdata_r mpicom     = ' ,mpicom_r
+      write(o_logunit,'(2a,2i5)') subName,'ni_r,nj_r          = ' ,ni_r,nj_r
+      write(o_logunit,'(2a,2i7)') subname,'x2o_r lsize, nflds = ' ,mct_aVect_lsize(x2o_r),mct_aVect_nRAttr(x2o_r)
+      write(o_logunit,'(2a,2i7)') subname,'r2x_r lsize, nflds = ' ,mct_aVect_lsize(r2x_r),mct_aVect_nRAttr(r2x_r)
+      write(o_logunit,'(2a,2i7)') subname,'r2x_o lsize, nflds = ' ,mct_aVect_lsize(r2x_o),mct_aVect_nRAttr(r2x_o)
+      write(o_logunit,'(2a,2i7)') subname,'gsMap_r lsize      = ' , mct_gsMap_lsize(gsMap_r, mpicom_r)
+   endif
    !--------------------------------------------------------------------------------------
    ! init additional data-types needed for ocpl's 3d global/regional ocean coupling 
    !--------------------------------------------------------------------------------------
    
-   write(o_logunit,F01) "call ocpl_pop_init"  ; call shr_sys_flush(o_logunit)
+   if (seq_comm_iamroot(OCNID_o)) write(o_logunit,F01) "call ocpl_pop_init" 
    call ocpl_pop_init( p2x_p, p2x_2d_p, p2x_3d_p)
 
-   write(o_logunit,F01) "call ocpl_roms_init" ; call shr_sys_flush(o_logunit)
+   if (seq_comm_iamroot(OCNID_o)) write(o_logunit,F01) "call ocpl_roms_init" 
    call ocpl_roms_init()
 
    !--------------------------------------------------------------------------------------
    ! init all maps (surface, 3d, curtain)
    !--------------------------------------------------------------------------------------
-   write(o_logunit,*) subName, "initialize all maps..."
+   if (seq_comm_iamroot(OCNID_o)) write(o_logunit,*) subName, "initialize all maps..."
    call ocpl_map_init()
 
    !--------------------------------------------------------------------------------------
    ! map & merge pop & roms output to create ocpl output
    !--------------------------------------------------------------------------------------
-   write(o_logunit,'(2a)') subname,"map: r2x_r -> r2x_o"
+   if (seq_comm_iamroot(OCNID_o)) write(o_logunit,'(2a)') subname,"map: r2x_r -> r2x_o"
    call mct_sMat_avMult(r2x_r, sMatp_r2o, r2x_o,vector=usevector)
 
-   write(o_logunit,'(2a)') subname,"map: p2x_p -> p2x_o"
+   if (seq_comm_iamroot(OCNID_o)) write(o_logunit,'(2a)') subname,"map: p2x_p -> p2x_o"
    call mct_sMat_avMult(p2x_p, sMatp_p2o, p2x_o,vector=usevector)
 
    if (debug > 0) then
@@ -316,7 +327,7 @@ contains
       write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max o2x_o SST = ',minval(p2x_o%rAttr(k,:)),maxval(p2x_o%rAttr(k,:))
    end if
 
-   write(o_logunit,'(a)') subname,"merge: r2x_o -> o2x_o"
+   if (seq_comm_iamroot(OCNID_o)) write(o_logunit,'(a)') subname,"merge: r2x_o -> o2x_o"
    k = mct_avect_indexra(o2x_o,'So_t')
    lsize_o = mct_aVect_lsize( o2x_o )
    do n=1,lsize_o
@@ -335,7 +346,7 @@ contains
    !--------------------------------------------------------------------------------------
    ! done
    !--------------------------------------------------------------------------------------
-   write(o_logunit,F00) "EXIT" ; call shr_sys_flush(o_logunit)
+   if (seq_comm_iamroot(OCNID_o)) write(o_logunit,F00) "EXIT"
 
    !--- Reset shr logging to original values ---
    call shr_file_setLogUnit (shrlogunit) ! restore log unit
@@ -394,84 +405,84 @@ contains
    call shr_file_getLogUnit (shrlogunit) ! save log unit
    call shr_file_getLogLevel(shrloglev)  ! save log level
    call shr_file_setLogUnit (o_logunit)     ! set shared log unit to ocpl's logUnit
-   write(o_logunit,F00) "ENTER" ; call shr_sys_flush(o_logunit)
+   if (seq_comm_iamroot(OCNID_o)) write(o_logunit,F00) "ENTER" 
 
    call seq_timemgr_EClockGetData( EClock, curr_ymd=ymd, curr_tod=tod )
-   write(o_logunit,*) subname,'cpl target model date: ymd, tod =',ymd,tod
+   if (seq_comm_iamroot(OCNID_o)) write(o_logunit,*) subname,'cpl target model date: ymd, tod =',ymd,tod
 
    !----------------------------------------------------------------------------
    ! export data from roms (for pop 3d restoring)
    !----------------------------------------------------------------------------
-   write(o_logunit,F01) "export 3d fields from roms (for pop 3d restoring)" ; call shr_sys_flush(o_logunit)
+   if (seq_comm_iamroot(OCNID_o)) write(o_logunit,F01) "export 3d fields from roms (for pop 3d restoring)" 
    call ocpl_roms_export( )
 
    !----------------------------------------------------------------------------
    ! map: pop -> roms  (pop 3d restoring)
    !----------------------------------------------------------------------------
-   write(o_logunit,F01) "map: roms->pop (for pop 3d restoring)" ; call shr_sys_flush(o_logunit)
+   if (seq_comm_iamroot(OCNID_o)) write(o_logunit,F01) "map: roms->pop (for pop 3d restoring)" 
    call ocpl_map_roms2pop()
 
    !----------------------------------------------------------------------------
    ! import data into pop (pop 3d restoring)
    !----------------------------------------------------------------------------
-   write(o_logunit,F01) "import ocean coupling fields into pop (3d restoring)" ; call shr_sys_flush(o_logunit)
+   if (seq_comm_iamroot(OCNID_o)) write(o_logunit,F01) "import ocean coupling fields into pop (3d restoring)" 
 !  call ocpl_pop_import( )
    call ocpl_pop_import(p2x_p ) ! adds non-standard fields to validate/debug pop restoring
 
    !----------------------------------------------------------------------------
    ! map: ocpl -> pop
    !----------------------------------------------------------------------------
-   write(o_logunit,'(2a)') subname,"map: x2o_o -> x2o_p"
+   if (seq_comm_iamroot(OCNID_o)) write(o_logunit,'(2a)') subname,"map: x2o_o -> x2o_p"
    call mct_sMat_avMult(x2o_o, sMatp_o2p, x2o_p,vector=usevector)
 
    !----------------------------------------------------------------------------
    ! run pop
    !----------------------------------------------------------------------------
-   write(o_logunit,F01) "call pop_run_mct"
+   if (seq_comm_iamroot(OCNID_o)) write(o_logunit,F01) "call pop_run_mct"
    call pop_run_mct( EClock, cdata_p, x2o_p, p2x_p)
 
    !----------------------------------------------------------------------------
    ! export data from pop (roms lateral BCs)
    !----------------------------------------------------------------------------
-   write(o_logunit,F01) "export ocean coupling fields from pop (roms lateral BCs)" ; call shr_sys_flush(o_logunit)
+   if (seq_comm_iamroot(OCNID_o)) write(o_logunit,F01) "export ocean coupling fields from pop (roms lateral BCs)" 
    call ocpl_pop_export( p2x_2d_p, p2x_3d_p)    ! to do?  remove args as aVects are in ocpl_data_mod
 
    !----------------------------------------------------------------------------
    ! map: pop -> roms  (roms lateral BCs)
    !----------------------------------------------------------------------------
-   write(o_logunit,F01) "map: pop->roms (roms lateral BCs)" ; call shr_sys_flush(o_logunit)
+   if (seq_comm_iamroot(OCNID_o)) write(o_logunit,F01) "map: pop->roms (roms lateral BCs)" 
    call ocpl_map_pop2roms()
 
    !----------------------------------------------------------------------------
    ! import data to roms (roms lateral BCs)
    !----------------------------------------------------------------------------
-   write(o_logunit,F01) "import ocean coupling fields into roms (lateral BCs)" ; call shr_sys_flush(o_logunit)
+   if (seq_comm_iamroot(OCNID_o)) write(o_logunit,F01) "import ocean coupling fields into roms (lateral BCs)" 
    call ocpl_roms_import( )
 
    !----------------------------------------------------------------------------
    ! run roms
    !----------------------------------------------------------------------------
-   write(o_logunit,*) subname,"map: x2o_o -> x2o_r"
+   if (seq_comm_iamroot(OCNID_o)) write(o_logunit,*) subname,"map: x2o_o -> x2o_r"
    call mct_sMat_avMult(x2o_o, sMatp_o2r, x2o_r,vector=usevector)
 
    if (debug > 0) then
       k = mct_avect_indexra(x2o_o,'Foxx_lwup')
-      write(o_logunit,'(2a,2i6)'   ) subname,'<DEBUG> Foxx_lwup index = ',k
-      write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max x2o_o Foxx_lwup= ',minval(x2o_o%rAttr(k,:)),maxval(x2o_o%rAttr(k,:))
-      write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max x2o_r Foxx_lwup= ',minval(x2o_r%rAttr(k,:)),maxval(x2o_r%rAttr(k,:))
+      if (seq_comm_iamroot(OCNID_o)) write(o_logunit,'(2a,2i6)'   ) subname,'<DEBUG> Foxx_lwup index = ',k
+      if (seq_comm_iamroot(OCNID_o)) write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max x2o_o Foxx_lwup= ',minval(x2o_o%rAttr(k,:)),maxval(x2o_o%rAttr(k,:))
+      if (seq_comm_iamroot(OCNID_o)) write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max x2o_r Foxx_lwup= ',minval(x2o_r%rAttr(k,:)),maxval(x2o_r%rAttr(k,:))
    end if
 
-   write(o_logunit,F01) "call roms_run_mct"
+   if (seq_comm_iamroot(OCNID_o)) write(o_logunit,F01) "call roms_run_mct"
    call roms_run_mct( EClock, cdata_r, x2o_r, r2x_r)
 
 
    !--------------------------------------------------------------------------------------
    ! map & merge pop & roms output to create ocpl output
    !--------------------------------------------------------------------------------------
-   write(o_logunit,'(2a)') subname,"map: r2x_r -> r2x_o"
+   if (seq_comm_iamroot(OCNID_o)) write(o_logunit,'(2a)') subname,"map: r2x_r -> r2x_o"
    call mct_sMat_avMult(r2x_r, sMatp_r2o, r2x_o,vector=usevector)
 
-   write(o_logunit,'(2a)') subname,"map: p2x_p -> p2x_o"
+   if (seq_comm_iamroot(OCNID_o)) write(o_logunit,'(2a)') subname,"map: p2x_p -> p2x_o"
    call mct_sMat_avMult(p2x_p, sMatp_p2o, p2x_o,vector=usevector)
 
    if (debug > 0) then
@@ -482,7 +493,7 @@ contains
       write(o_logunit,'(2a,2e12.4)') subname,'<DEBUG> min/max o2x_o SST = ',minval(p2x_o%rAttr(k,:)),maxval(p2x_o%rAttr(k,:))
    end if
 
-   write(o_logunit,'(a)') subname,"merge: r2x_o -> o2x_o"
+   if (seq_comm_iamroot(OCNID_o)) write(o_logunit,'(a)') subname,"merge: r2x_o -> o2x_o"
    k = mct_avect_indexra(o2x_o,'So_t')
    lsize_o = mct_aVect_lsize( o2x_o )
    do n=1,lsize_o
@@ -512,7 +523,7 @@ contains
 #endif
 
    !--- Reset shr logging to original values ---
-   write(o_logunit,F00) "EXIT " ; call shr_sys_flush(o_logunit)
+   if (seq_comm_iamroot(OCNID_o)) write(o_logunit,F00) "EXIT " 
    call shr_file_setLogUnit (shrlogunit) ! restore log unit
    call shr_file_setLogLevel(shrloglev)  ! restore log level
 
@@ -558,15 +569,15 @@ subroutine ocn_final_mct( EClock, cdata_o, x2o_o, o2x_o)
    call shr_file_getLogUnit (shrlogunit) ! save log unit
    call shr_file_getLogLevel(shrloglev)  ! save log level
    call shr_file_setLogUnit (o_logunit)  ! set shared log unit to ocpl's logUnit
-   write(o_logunit,F00) "ENTER" ; call shr_sys_flush(o_logunit)
+   if (seq_comm_iamroot(OCNID_o)) write(o_logunit,F00) "ENTER" 
 
-   write(o_logunit,F01) "pop_final_mct call" ; call shr_sys_flush(o_logunit)
+   if (seq_comm_iamroot(OCNID_o)) write(o_logunit,F01) "pop_final_mct call" 
    call pop_final_mct( EClock, cdata_o, x2o_o, o2x_o)
 
-   write(o_logunit,F01) "roms_final_mct call" ; call shr_sys_flush(o_logunit)
+   if (seq_comm_iamroot(OCNID_o)) write(o_logunit,F01) "roms_final_mct call" 
    call roms_final_mct( EClock, cdata_r, x2o_r, r2x_r)
 
-   write(o_logunit,F00) "EXIT" ; call shr_sys_flush(o_logunit)
+   if (seq_comm_iamroot(OCNID_o)) write(o_logunit,F00) "EXIT" 
 
    !--- restore shr logging to original values ---
    call shr_file_setLogUnit (shrlogunit) ! restore log unit

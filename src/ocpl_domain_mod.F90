@@ -5,7 +5,7 @@ module ocpl_domain_mod
 
 !BOP
 ! !MODULE: ocpl_domain_mod
-! 
+!
 ! !INTERFACE:
 
 ! !DESCRIPTION:
@@ -21,7 +21,7 @@ module ocpl_domain_mod
    use seq_infodata_mod, only : seq_infodata_getdata, seq_infodata_putdata
 
    implicit none
-   private              ! all data private by default 
+   private              ! all data private by default
    SAVE                 ! save everything
 
 ! !PUBLIC MEMBER FUNCTIONS:
@@ -77,7 +77,7 @@ subroutine ocpl_domain_init()
    real   (R8), pointer :: data(:)
    integer(IN), pointer :: gIndex(:)
 
-   integer(IN)             :: nk_o  ! depth, assumed to be 1 
+   integer(IN)             :: nk_o  ! depth, assumed to be 1
    character(len=8) :: decomp   = "2d1d"
    character(len=256) :: domainfile = "/glade/p/cesm/cseg/inputdata/share/domains/domain.ocn.gst03_tx0.1v3.210514.nc"
    character(len=8) ::  latName = "yc"
@@ -93,10 +93,9 @@ subroutine ocpl_domain_init()
    character(*), parameter :: subName = "(ocpl_domain_init) "
    namelist /ocpl_nml/ domainfile, latName, lonName, maskName, areaName, fracName, readFrac, decomp
 !-----------------------------------------------------------------------------------------
-!  
+!
 !-----------------------------------------------------------------------------------------
    call mpi_comm_rank(mpicom_o, my_task, ierr)
-   print *,__FILE__,__LINE__,master_task, my_task
    if(my_task == master_task) then
       write(o_logUnit,'(2a)') subname,"Enter"
 
@@ -123,7 +122,7 @@ subroutine ocpl_domain_init()
    call seq_infodata_PutData( infodata_o, ocn_nx = ni_o , ocn_ny = nj_o)
    if(my_task == master_task) then
       !--------------------------------------------------------------------------------------
-      write(o_logUnit,'(2a)') subname,"Exit" 
+      write(o_logUnit,'(2a)') subname,"Exit"
       !--------------------------------------------------------------------------------------
    endif
 end subroutine ocpl_domain_init
