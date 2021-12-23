@@ -247,10 +247,11 @@ subroutine ocpl_pop_import(p2x_p)   ! p2x_p used to put temporary debug fields o
    real(r8)                :: rday ! restoring time-scale
    real(r8)                :: frac ! roms cell fraction mapped to pop grid
    logical                 :: first_call = .true.
-   logical                 :: pop_restoring  = .true. ! normally true, false ocption for DEBUGing
+   logical                 :: pop_restoring  = .true. ! normally true, false only for DEBUG
    integer(IN)             :: dbug_save
    character(*), parameter :: subName = "(ocpl_pop_import) "
-
+   integer                 :: n_save   ! Jaison, Sep/20/2021, with suggestions from Brian & Abishek.
+ 
 !-----------------------------------------------------------------------------------------
 !
 !-----------------------------------------------------------------------------------------
@@ -280,6 +281,12 @@ subroutine ocpl_pop_import(p2x_p)   ! p2x_p used to put temporary debug fields o
    if (first_call) write(o_logunit,'(2a,L2)') subName,"pop 3d restoring = ",pop_restoring
 
    if (pop_restoring) then 
+   !! Sep/17/2021: In the previous version of this program, n=0 step was done within the do loop on "iblock".
+   !!                Which was okay for a case with nblocks_clinic=1 (total blocks on a processor) but not for 
+   !!                cases with nblocks_clinic > 1. The new variable n_save fixes this issue by using correct
+   !!                initial value for "n" for each block within the "iblock" do loop.
+   !!                Jaison, Abishek and Brian, Sep/20/2021.
+   n_save = 0  
    do iblock = 1, nblocks_clinic
       this_block = get_block(blocks_clinic(iblock),iblock)
 
@@ -306,7 +313,7 @@ subroutine ocpl_pop_import(p2x_p)   ! p2x_p used to put temporary debug fields o
       if (first_call) then 
          write(o_logunit,'(2a)') subName,"first call: set restoring max levels and rtau"
 
-         n = 0
+         n = n_save ! Sep/20/2021: Use the maximum value from last iteration
          do j=this_block%jb,this_block%je
          do i=this_block%ib,this_block%ie
             n = n + 1
@@ -365,12 +372,14 @@ subroutine ocpl_pop_import(p2x_p)   ! p2x_p used to put temporary debug fields o
             PT_RESTORE_RTAU     (:,:,iblock) = 0.0_r8
          end if 
 
-      end if
+      end if   ! first_call
 
       !-----------------------------------------------------------------------------------
       ! update PT & S values that pop will restore to (RTAU and MAX_LEVEL are constant)
       !-----------------------------------------------------------------------------------
-      n = 0
+      n = n_save       ! Sep/20/2021: Use the maximum value from last iteration (do not consider
+                       !              the iterations done under "first_call" abvoe, that is just to 
+                       !              initialize few arrays).
       do j=this_block%jb,this_block%je
       do i=this_block%ib,this_block%ie
          n = n + 1
@@ -404,6 +413,7 @@ subroutine ocpl_pop_import(p2x_p)   ! p2x_p used to put temporary debug fields o
                                                                                   ,maxval( S_INTERIOR_DATA    (:,:,1,iblock,1))
       end if
 
+      n_save = n       ! Sep/20/2021: Update n_save for next iteration
    enddo ! iblock
    end if ! pop_restoring
 

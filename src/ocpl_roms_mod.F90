@@ -382,6 +382,9 @@ subroutine ocpl_roms_import()
    real(R8)    :: dz                       ! thickness of one cell
    real(R8)    :: udepth,vdepth            ! vertically integrated depth
 
+   INTEGER :: iu, iv, ju, jv ! I and J indices for U and V grid (for each side,
+                             ! there are differences in either i or j. These
+                             ! indices are to make a generalized code/loop.
    character(*), parameter :: subName = "(ocpl_roms_import) "
 
 !-------------------------------------------------------------------------------
@@ -396,6 +399,9 @@ subroutine ocpl_roms_import()
    ! re-compute ubar & vbar by vertical integration of u & v (on decomposed grid)
    !--------------------------------------------------------------------------------------
 
+
+
+
    do k=1,4 ! four curtains: N,E,S,W
 
       if  ((k==k_Scurtain .and. do_Scurtain==.true.) &
@@ -405,43 +411,173 @@ subroutine ocpl_roms_import()
 
          lsize = mct_aVect_lsize (p2x_3d_rc(k,1))
          if (lsize > 0) then !--- non-zero local aVect size ---
-            do ij=1,lsize ! for each roms grid BC cell
+            !## Jaison Kurian, Sep/29/2021: Modified the code below to have
+            !## proper ROMS i or j indices for the open boundaries.
+            !## Step 1: deal with 1:lsize-1 points as in the original version,
+            !but use
+            !##          Jstr (==1) or JstrR (==0) wherever appropriate
+            !##          (similarly Istr and IstrR, proper usage will fix
+            !##          the index=-1 error).
+            !##         Assumptions made:
+            !##          MCT arrays like
+            !p2x_3d_rc(k,n)%rAttr(k_p2x_3d_So_uvel,ij) &
+            !##             p2x_2d_rc(k)%rAttr(k_p2x_2d_So_ubar,ij) have indices
+            !##             from 1 to lsize-1 or 1 to lsize. (ROMS RHO
+            !##             grid, xi_v and eta_u grid/axes have indices from
+            !##             0 to Jend or 0 to Iend, which is same as the lsize).
+            !##             For this reason, deal with 1:lsize-1 in the common
+            !do loop
+            !##             and handle the grid point at lsize separately (see
+            !below). 
 
-               !--- determine roms' global i,j indicies ---
+            do ij=1,lsize-1 ! for each roms grid BC cell (lsize is handled separately)
+
+               !--- determine roms' global i,j indicies ---         ! For all:
+               !ij=1:lsize-1
                if (k == k_Wcurtain) then        ! 
-                  i = 1
-                  j = ij + BOUNDS(nestID)%JstrR(MyRank) - 1
-               else if (k == k_Ncurtain) then
-                  i = ij + BOUNDS(nestID)%IstrR(MyRank) - 1
-                  j = globalJSize0(nestID) + 1
+                  iu = 1                                            ! uses i=1 and i=0 on RHO grid 
+                  iv = 0                                            ! uses i=0 on RHO grid
+                  ju = ij + BOUNDS(nestID)%JstrR(MyRank) - 1        ! uses j=0:Jend-1
+                  jv = ij + BOUNDS(nestID)%Jstr(MyRank) - 1         ! uses j=1:Jend 
                else if (k == k_Ecurtain) then
-                  i = globalISize0(nestID) + 1
-                  j = ij + BOUNDS(nestID)%JstrR(MyRank) - 1
+                  iu = globalISize0(nestID) + 1                     ! uses Iend and Iend-1
+                  iv = globalISize0(nestID) + 1                     ! uses Iend
+                  ju = ij + BOUNDS(nestID)%JstrR(MyRank) - 1        ! uses j=0:Jend-1
+                  jv = ij + BOUNDS(nestID)%Jstr(MyRank) - 1         ! uses j=1:Jend
                else if (k == k_Scurtain) then
-                  i = ij + BOUNDS(nestID)%IstrR(MyRank) - 1
-                  j = 1
+                  iu = ij + BOUNDS(nestID)%Istr(MyRank) - 1         ! uses i=1:Iend
+                  iv = ij + BOUNDS(nestID)%IstrR(MyRank) - 1        ! uses i=0:Iend-1
+                  ju = 0                                            ! uses j=0 on RHO grid
+                  jv = 1                                            ! uses j=1 and j=0 on RHO grid
+               else if (k == k_Ncurtain) then                       
+                  iu = ij + BOUNDS(nestID)%Istr(MyRank) - 1         ! uses i=1:Iend
+                  iv = ij + BOUNDS(nestID)%IstrR(MyRank) - 1        ! uses i=0:Iend-1
+                  ju = globalJSize0(nestID) + 1                     ! uses Jend
+                  jv = globalJSize0(nestID) + 1                     ! uses Jend and Jend-1
                endif
-
+               write(o_logunit,*) "Inside ocpl_roms_import iu=",iu," iv=",iv," ju=",ju," jv=",jv," k=",k," my rank=",MyRank," ij:",ij
                ubar   = 0.0_R8
                vbar   = 0.0_R8
                udepth = 0.0_R8
                vdepth = 0.0_R8
                do n=1,nlev_r !--- vertical integration ---
-                  dz = (ROMS_GRID(nestID)%Hz(i,j,n) + ROMS_GRID(nestID)%Hz(i-1,j,n) )/2.0_R8
+                  dz = (ROMS_GRID(nestID)%Hz(iu,ju,n) + ROMS_GRID(nestID)%Hz(iu-1,ju,n) )/2.0_R8 
                   ubar   = ubar   + dz*p2x_3d_rc(k,n)%rAttr(k_p2x_3d_So_uvel,ij)
                   udepth = udepth + dz
-                  dz = (ROMS_GRID(nestID)%Hz(i,j,n) + ROMS_GRID(nestID)%Hz(i,j-1,n) )/2.0_R8
+                  dz = (ROMS_GRID(nestID)%Hz(iv,jv,n) + ROMS_GRID(nestID)%Hz(iv,jv-1,n) )/2.0_R8
                   vbar   = vbar   + dz*p2x_3d_rc(k,n)%rAttr(k_p2x_3d_So_vvel,ij)
                   vdepth = vdepth + dz
                end do 
-               p2x_2d_rc(k)%rAttr(k_p2x_2d_So_ubar,ij) = ubar/udepth
-               p2x_2d_rc(k)%rAttr(k_p2x_2d_So_vbar,ij) = vbar/vdepth
+               p2x_2d_rc(k)%rAttr(k_p2x_2d_So_ubar,ij) = ubar/udepth   ! final ij range is 1 to lsize+1
+               p2x_2d_rc(k)%rAttr(k_p2x_2d_So_vbar,ij) = vbar/vdepth   ! final ij range is 1 to lsize
 
             end do ! do ij - loop over roms grid cells
+
+            !## Step 2: deal with the extra grid point depending on the open
+            !##          boundary side:
+
+
+            ubar   = 0.0_R8  ! need to be initialized again!
+            vbar   = 0.0_R8
+            udepth = 0.0_R8
+            vdepth = 0.0_R8
+            !--- determine roms' global i,j indicies ---
+            ij = lsize      ! last grid point, no need for do-loop since it is a single point
+
+            if (k == k_Wcurtain .or. k == k_Ecurtain) then  ! add 1 point for U
+
+               ju = ij + BOUNDS(nestID)%JstrR(MyRank) - 1        ! uses j=Jend
+               if (k == k_Wcurtain ) then        ! 
+                 iu = 1
+               else if (k == k_Ecurtain ) then        ! 
+                 iu = globalISize0(nestID) + 1
+               end if
+
+               do n=1,nlev_r !--- vertical integration ---
+                  dz = (ROMS_GRID(nestID)%Hz(iu,ju,n) + ROMS_GRID(nestID)%Hz(iu-1,ju,n) )/2.0_R8
+                  ubar   = ubar   + dz*p2x_3d_rc(k,n)%rAttr(k_p2x_3d_So_uvel,ij)
+                  udepth = udepth + dz
+               end do
+               p2x_2d_rc(k)%rAttr(k_p2x_2d_So_ubar,ij) = ubar/udepth
+
+            else if (k == k_Scurtain .or. k == k_Ncurtain) then ! add 1 point for V
+
+               iu = ij + BOUNDS(nestID)%IstrR(MyRank) - 1       ! uses i=Iend
+               if (k == k_Scurtain ) then        ! 
+                  ju = 1 
+               else if (k == k_Ncurtain ) then        ! 
+                  ju = globalJSize0(nestID) + 1
+               end if
+               do n=1,nlev_r !--- vertical integration ---
+                  dz = (ROMS_GRID(nestID)%Hz(iu,ju,n) + ROMS_GRID(nestID)%Hz(iu,ju-1,n) )/2.0_R8
+                  vbar   = vbar   + dz*p2x_3d_rc(k,n)%rAttr(k_p2x_3d_So_vvel,ij)
+                  vdepth = vdepth + dz
+               end do
+               p2x_2d_rc(k)%rAttr(k_p2x_2d_So_vbar,ij) = vbar/vdepth
+            end if
 
          end if ! lsize > 0
       end if ! curtain is active
    end do  ! do k=1,4  ~ over all four curtains: N,E,S,W
+
+
+
+
+!   do k=1,4 ! four curtains: N,E,S,W
+!
+!      if  ((k==k_Scurtain .and. do_Scurtain==.true.) &
+!      .or. (k==k_Ecurtain .and. do_Ecurtain==.true.) &
+!      .or. (k==k_Ncurtain .and. do_Ncurtain==.true.) &
+!     .or. (k==k_Wcurtain .and. do_Wcurtain==.true.) ) then
+
+!         lsize = mct_aVect_lsize (p2x_3d_rc(k,1))
+!         if (lsize > 0) then !--- non-zero local aVect size ---
+!            do ij=1,lsize ! for each roms grid BC cell
+
+!              !--- determine roms' global i,j indicies ---
+!               if (k == k_Wcurtain) then        ! 
+!                  i = 1
+!                  j = ij + BOUNDS(nestID)%JstrR(MyRank) - 1
+!               else if (k == k_Ncurtain) then
+!                  i = ij + BOUNDS(nestID)%IstrR(MyRank) - 1
+!                  j = globalJSize0(nestID) + 1
+!               else if (k == k_Ecurtain) then
+!                  i = globalISize0(nestID) + 1
+!                  j = ij + BOUNDS(nestID)%JstrR(MyRank) - 1
+!               else if (k == k_Scurtain) then
+!                  i = ij + BOUNDS(nestID)%IstrR(MyRank) - 1
+!                  j = 1
+!               endif
+!               write(o_logunit,*) "Inside ocpl_roms_import i=",i," j=",j," k=",k," my rank=",MyRank," ij:",ij
+!               ubar   = 0.0_R8
+!               vbar   = 0.0_R8
+!               udepth = 0.0_R8
+!               vdepth = 0.0_R8
+!               do n=1,nlev_r !--- vertical integration ---
+!                  if (i == 0) then
+!                  dz = ROMS_GRID(nestID)%Hz(i,j,n)
+!                  else
+!                  dz = (ROMS_GRID(nestID)%Hz(i,j,n) + ROMS_GRID(nestID)%Hz(i-1,j,n) )/2.0_R8
+!                  endif 
+!                  ubar   = ubar   + dz*p2x_3d_rc(k,n)%rAttr(k_p2x_3d_So_uvel,ij)
+!                  udepth = udepth + dz
+!
+!                  if (j == 0) then
+!                  dz = ROMS_GRID(nestID)%Hz(i,j,n)
+!                  else
+!                  dz = (ROMS_GRID(nestID)%Hz(i,j,n) + ROMS_GRID(nestID)%Hz(i,j-1,n) )/2.0_R8
+!                  endif
+!                  vbar   = vbar   + dz*p2x_3d_rc(k,n)%rAttr(k_p2x_3d_So_vvel,ij)
+!                  vdepth = vdepth + dz
+!               end do 
+!               p2x_2d_rc(k)%rAttr(k_p2x_2d_So_ubar,ij) = ubar/udepth
+!               p2x_2d_rc(k)%rAttr(k_p2x_2d_So_vbar,ij) = vbar/vdepth
+!
+!            end do ! do ij - loop over roms grid cells
+!
+!         end if ! lsize > 0
+!      end if ! curtain is active
+!   end do  ! do k=1,4  ~ over all four curtains: N,E,S,W
 
   !-----------------------------------------------------------------------------
   ! create global (not decomposed/distributed) curtain aVects
