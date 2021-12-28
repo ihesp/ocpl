@@ -85,7 +85,7 @@ def _build_ocpl():
        # my_file is the full path name of the buildlib that you are calling
        my_file = os.path.join(srcroot, "components", "roms", "cime_config", "buildlib") 
        # same args received by ocpl buildlib are sent to pop's buildlib
-       cmd_line_args = " {} {} {}".format(caseroot,libroot,bldroot)
+       cmd_line_args = " {} {} {}".format(caseroot,libroot,bldroot+".roms")
 
        print("<ocpl:_build_ocpl> my_file     = %s" % my_file   )
        print("<ocpl:_build_ocpl> cmd_lin_args= %s" % cmd_line_args)
@@ -97,22 +97,6 @@ def _build_ocpl():
 #      expect(rc == 0, "roms buildlib failure")
 
        #---- "hide" roms Filepath, etc., as obj dir is shared by other builds ---
-       objroot = case.get_value("OBJROOT")
-       filepath_file  = os.path.join(objroot,"ocn","obj","Filepath")
-       depends_file   = os.path.join(objroot,"ocn","obj","Depends")
-       deppath_file   = os.path.join(objroot,"ocn","obj","Deppath")
-       makedep_file   = os.path.join(objroot,"ocn","obj","MakeDepend")
-       srcfile_file   = os.path.join(objroot,"ocn","obj","Srcfiles")
-       filepath_file0 = os.path.join(objroot,"ocn","obj",  "Filepath.roms")
-       depends_file0  = os.path.join(objroot,"ocn","obj",   "Depends.roms")
-       deppath_file0  = os.path.join(objroot,"ocn","obj",   "Deppath.roms")
-       makedep_file0  = os.path.join(objroot,"ocn","obj","MakeDepend.roms")
-       srcfile_file0  = os.path.join(objroot,"ocn","obj",  "Srcfiles.roms")
-       os.rename(filepath_file,filepath_file0)
-       os.rename(depends_file , depends_file0)
-       os.rename(deppath_file , deppath_file0)
-       os.rename(makedep_file , makedep_file0)
-       os.rename(srcfile_file , srcfile_file0)
 
     logger.info("-----------------------------------------------------------------")
     logger.info("ocpl buildlib building ocpl...")
@@ -163,10 +147,11 @@ def _build_ocpl():
 
 #       cmd = "%s complib -j %d MODEL=ocpl COMPLIB=%s -f %s USER_CPPDEFS=\"%s\"" \
 #           % (gmake, gmake_j, complib, makefile, ocpl_cppdefs )
-        cmd = "%s complib -j %d MODEL=ocpl COMPLIB=%s -f %s                    " \
-            % (gmake, gmake_j, complib, makefile               )
+        ocpl_cppdefs = "-I{}.roms".format(bldroot)
+        cmd = "{} complib -j {} MODEL=ocpl USER_CPPDEFS={} COMPLIB={} -f {} " \
+              .format(gmake, gmake_j, ocpl_cppdefs, complib, makefile)
 
-        rc, out, err = run_cmd(cmd, from_dir=bldroot)
+        rc, out, err = run_cmd(cmd, from_dir=bldroot, verbose=True)
         expect(rc == 0, "Command %s failed rc=%d\nout=%s\nerr=%s" % (cmd, rc, out, err))
 
         logger.info("Command %s completed with output %s\nerr %s" ,cmd, out, err)
