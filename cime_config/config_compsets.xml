@@ -44,5 +44,27 @@
 
 
   <!-- ENTRIES -->
+<entries>
+  <entry id="RUN_TYPE">
+    <values match="first" >
+      <value compset="2000_DATM%NYF_SLND_DICE%SSMI_OCPL_DROF%NYF_SGLC_SWAV">hybrid</value>
+    </values>
+  </entry>
+  <entry id="RUN_REFCASE">
+    <values match="first" >
+      <value compset="2000_DATM%NYF_SLND_DICE%SSMI_OCPL_DROF%NYF_SGLC_SWAV">g.e20.G.TL319_t13.control.001_hfreq</value>
+    </values>
+  </entry>
+  <entry id="RUN_REFDATE">
+    <values match="first" >
+      <value compset="2000_DATM%NYF_SLND_DICE%SSMI_OCPL_DROF%NYF_SGLC_SWAV">0053-01-01</value>
+    </values>
+  </entry>
+  <entry id="RUN_REFDIR">
+    <values match="first" >
+      <value compset="2000_DATM%NYF_SLND_DICE%SSMI_OCPL_DROF%NYF_SGLC_SWAV">ihesp_init</value>
+    </values>
+  </entry>
+</entries>
 
 </compsets>

@@ -57,10 +57,13 @@ def _create_ocpl_namelists(case, confdir, infile, nmlgen):
     #----------------------------------------------------
     # Write out namelist groups
     #----------------------------------------------------
-    groups=['ocpl_nml']
 
     namelist_file = os.path.join(confdir, "ocpl_in")
-    nmlgen.write_output_file(namelist_file, data_list_path, groups=groups, sorted_groups=False)
+    nmlgen.write_output_file(namelist_file, data_list_path, groups=["ocpl_nml"], sorted_groups=False)
+
+    namelist_file = os.path.join(confdir, "ocpl_maps.rc")
+    nmlgen.write_seq_maps(namelist_file, groups=["ocpl_maps"])
+
 
 ###############################################################################
 def buildnml(case, caseroot, compname):
@@ -115,6 +118,9 @@ def buildnml(case, caseroot, compname):
 #   stat,_,_ = run_sub_or_cmd(cmd, (caseroot), "buildnml", (case, caseroot, compname), case=case)
     run_sub_or_cmd(cmd, (caseroot), "buildnml", (case, caseroot, compname), case=case)
 #   expect(stat == 0, "pop buildnml failure")
+
+# Turn off OCN_TRACER_MODULES
+    case.set_value("OCN_TRACER_MODULES","")
 
     logger.info("-----------------------------------------------------------------")
     logger.info("ocpl buildnml calling roms buildnml...")
@@ -182,12 +188,12 @@ def buildnml(case, caseroot, compname):
 
         # copy namelist files to rundir
         if os.path.isdir(rundir):
-            file1  = os.path.join(confdir, "ocpl_in")
-            file2 = os.path.join(rundir, "ocpl_in")
-            if inst_string:
-                file2 += inst_string
-            logger.debug("OCPL namelist copy: file1 %s file2 %s " %(file1, file2))
-            shutil.copy2(file1, file2)
+            for file1 in [os.path.join(confdir, "ocpl_in"),os.path.join(confdir, "ocpl_maps.rc")]:
+                file2 = file1.replace(confdir, rundir)
+                if inst_string:
+                    file2 += inst_string
+                logger.debug("OCPL namelist copy: file1 %s file2 %s " %(file1, file2))
+                shutil.copy2(file1, file2)
 
 ###############################################################################
 def _main_func():
