@@ -60,7 +60,7 @@ module ocpl_map_mod
    integer(IN),parameter :: nestID = 1    ! roms nest (grid/domain) #1
 
    type(mct_sMatp)       :: sMatp_p2rc(4) ! curtain amps: pop -> roms (4-curtains: S,E,N,W)
-
+   logical :: master
 !=========================================================================================
 contains
 !=========================================================================================
@@ -95,7 +95,7 @@ subroutine ocpl_map_init()
 
    character(*), parameter :: subName = "(ocpl_map_init) "
    integer :: ierr, myrank
-   logical :: master
+
 !-----------------------------------------------------------------------------------------
 !
 !-----------------------------------------------------------------------------------------
@@ -115,10 +115,10 @@ subroutine ocpl_map_init()
       k = k_Scurtain
       call shr_mct_queryConfigFile(mpicom_p,configFile, &
            "pop2roms_Scurtain_file:",mapfile,"pop2roms_Scurtain_type:",maptype)
-      write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
+      if(master) write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
       call shr_mct_sMatPInitnc(sMatp_p2rc(k),gsMap_p,gsMap_rc(k),trim(mapfile),trim(maptype),mpicom_p)
    else if (master) then
-      write(o_logUnit,'(2a)') subname,"do_Scurtain = false" ;  call shr_sys_flush(o_logUnit)
+      write(o_logUnit,'(2a)') subname,"do_Scurtain = false" 
    end if
 
    if (do_Ecurtain) then
@@ -128,7 +128,7 @@ subroutine ocpl_map_init()
       if(master) write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
       call shr_mct_sMatPInitnc(sMatp_p2rc(k),gsMap_p,gsMap_rc(k),trim(mapfile),trim(maptype),mpicom_p)
    else if(master) then
-      write(o_logUnit,'(2a)') subname,"do_Ecurtain = false" ;  call shr_sys_flush(o_logUnit)
+      write(o_logUnit,'(2a)') subname,"do_Ecurtain = false" 
    end if
 
    if (do_Ncurtain) then
@@ -249,13 +249,11 @@ subroutine ocpl_map_pop2roms()
 
    character(*), parameter :: subName = "(ocpl_map_pop2roms) "
 
-   save
-
 !-----------------------------------------------------------------------------------------
 !
 !-----------------------------------------------------------------------------------------
 
-   write(o_logUnit,'(2a)') subname,"Enter" ;  call shr_sys_flush(o_logUnit)
+   if(master) write(o_logUnit,'(2a)') subname,"Enter" ;  call shr_sys_flush(o_logUnit)
    if (debug>0) write(o_logUnit,'(2a,i2)') subname,"debug level = ",debug
 
    !--------------------------------------------------------------------------------------
@@ -303,9 +301,9 @@ subroutine ocpl_map_pop2roms()
             kfld = mct_aVect_indexRA(p2x_2d_rc(k),"So_ssh" )
             xmin = minval(p2x_2d_rc(k)%rAttr(kfld,:))
             xmax = maxval(p2x_2d_rc(k)%rAttr(kfld,:))
-            write(o_logUnit,'(2a,i2,2es11.3)') subname,"2d map: k, rc ssh min,max = ",k,xmin,xmax
+            if(master) write(o_logUnit,'(2a,i2,2es11.3)') subname,"2d map: k, rc ssh min,max = ",k,xmin,xmax
          else
-            write(o_logUnit,'(2a,i3,a)')       subName,"2d map: k = ",k," lsize = 0 => no mapping"
+            if(master) write(o_logUnit,'(2a,i3,a)')       subName,"2d map: k = ",k," lsize = 0 => no mapping"
          end if
       end if
    end do
@@ -435,12 +433,12 @@ subroutine ocpl_map_pop2roms()
             end do ! do ij - loop over roms grid cells
          end do ! do nr ~ loop over roms layers
          end if ! lsize > 0 ~ non-zero tile size
-         write(o_logUnit,'(2a,i3,a)') subName,"3d map: k = ",k," lsize = 0 => no mapping"
+         if(master) write(o_logUnit,'(2a,i3,a)') subName,"3d map: k = ",k," lsize = 0 => no mapping"
       end if ! do_mapping => curtain is active
 
    end do  ! do k=1,4  ~ over all four curtains: N,E,S,W
 
-   write(o_logUnit,'(2a)') subname,"Exit" ;  call shr_sys_flush(o_logUnit)
+   if(master) write(o_logUnit,'(2a)') subname,"Exit" 
 
 end subroutine ocpl_map_pop2roms
 
@@ -496,7 +494,7 @@ subroutine ocpl_map_roms2pop()
 !
 !-----------------------------------------------------------------------------------------
 
-   if (debug>0) write(o_logUnit,'(2a)') subname,"Enter" ;  call shr_sys_flush(o_logUnit)
+   if (master .or. debug>0) write(o_logUnit,'(2a)') subname,"Enter" 
 
    !--- for accessing roms arrays with (i,j) indexing ---
    iMin = ROMS_BOUNDS(nestID)%IstrR(MyRank)
@@ -512,13 +510,17 @@ subroutine ocpl_map_roms2pop()
 
    !--- create weights that are 1.0 in roms interior, ramping down to 0.0 at roms boundary ---
    if (first_call) then
-      write(o_logUnit,'(2a,4i7)') subname,"roms grid:  local: LBi,LBj,UBi,UBj=",iMin,jMin,iMax,jMax
-      write(o_logUnit,'(2a,4i7)') subname,"roms grid, global: LBi,LBj,UBi,UBj=",LBi,LBj,UBi,UBj
+      if(master) then
+         write(o_logUnit,'(2a,4i7)') subname,"roms grid:  local: LBi,LBj,UBi,UBj=",iMin,jMin,iMax,jMax
+         write(o_logUnit,'(2a,4i7)') subname,"roms grid, global: LBi,LBj,UBi,UBj=",LBi,LBj,UBi,UBj
+      endif
       if ( mct_aVect_lSize(r2x_2d_r) == 0) then  ! local tile size = 0 (not data on this PE)
-         write(o_logUnit,'(2a)') subname,"create roms domain edge weights (this tile lsize = 0)"
-         write(o_logUnit,'(2a)') subname,"roms edge weight min/max = N/A (lsize=0)"
+         if(master) then
+            write(o_logUnit,'(2a)') subname,"create roms domain edge weights (this tile lsize = 0)"
+            write(o_logUnit,'(2a)') subname,"roms edge weight min/max = N/A (lsize=0)"
+         endif
       else
-         write(o_logUnit,'(2a)') subname,"create roms domain edge weights" ;  call shr_sys_flush(o_logUnit)
+         if(master) write(o_logUnit,'(2a)') subname,"create roms domain edge weights" ;  call shr_sys_flush(o_logUnit)
          do n = 1, mct_aVect_lSize(r2x_2d_r) ! loop over roms aVect(n), need corresponding roms global i,j
             i = mod(n-1,localISize) + iMin
             j = n/localISize        + jMin     ! requires/assumes fortran truncation
@@ -540,7 +542,7 @@ subroutine ocpl_map_roms2pop()
       end if
 
       !----- map merge weights: roms -> pop -----
-      write(o_logUnit,'(2a)') subname,"map merge weights: roms -> pop" ;  call shr_sys_flush(o_logUnit)
+      if(master) write(o_logUnit,'(2a)') subname,"map merge weights: roms -> pop" 
       call mct_sMat_avMult(r2x_2d_r, sMatp_r2p, r2x_2d_p,vector=usevector)
 
       if (debug>0 ) then
@@ -657,12 +659,12 @@ subroutine ocpl_map_roms2pop()
    !--------------------------------------------------------------------------------------
    ! Step 2) horizonal interpolation: roms -> pop  (all data at pop vertical levals)
    !--------------------------------------------------------------------------------------
-   if (debug>0) write(o_logUnit,'(2a)') subname,"map 3d horizontal" ;  call shr_sys_flush(o_logUnit)
+   if (debug>0) write(o_logUnit,'(2a)') subname,"map 3d horizontal" 
 
    call mct_sMat_avMult(r2x_2d_r, sMatp_r2p, r2x_2d_p,vector=usevector)
 
    do k_p = 1,nLev_rp
-      if (debug>0) write(o_logUnit,'(2a,i3)') subname,"map 3d horizontal, level=",k_p;  call shr_sys_flush(o_logUnit)
+      if (debug>0) write(o_logUnit,'(2a,i3)') subname,"map 3d horizontal, level=",k_p
       call mct_sMat_avMult(r2x_3d_rp(k_p), sMatp_r2p, r2x_3d_p(k_p),vector=usevector)
    end do
 

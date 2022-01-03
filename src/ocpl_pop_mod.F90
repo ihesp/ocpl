@@ -109,7 +109,7 @@ module ocpl_pop_mod
    type(seq_infodata_type), pointer :: infodata   
 
    integer(IN) :: dbug = 0    ! debug level (higher is more)
-
+   logical :: master
 !=========================================================================================
 contains
 !=========================================================================================
@@ -149,14 +149,14 @@ subroutine ocpl_pop_init( p2x_p, p2x_2d_p, p2x_3d_p)
 !------------------------------------------------------------------------------------------
 !
 !------------------------------------------------------------------------------------------
-
-   write(o_logunit,'(2a)') subname,"Enter"
+   master = (my_task == master_task)
+   if(master) write(o_logunit,'(2a)') subname,"Enter"
 
    nlev_p = km
    lsize = mct_gsMap_lsize(gsMap_p, mpicom_p)
-   write(o_logunit,'(2a,i4)') subName," gsMap_p lsize = ",lsize 
+   if(master) write(o_logunit,'(2a,i4)') subName," gsMap_p lsize = ",lsize 
    lsize = mct_aVect_lsize( p2x_p )
-   write(o_logunit,'(2a,i4)') subName,"     lsize     = ",lsize 
+   if(master) write(o_logunit,'(2a,i4)') subName,"     lsize     = ",lsize 
 
    !----- init 2d fields specifically for pop/roms coupling -----
    call mct_aVect_init(p2x_2d_p, rList=ocpl_fields_p2x_2d_fields,lsize=lsize)
@@ -164,7 +164,7 @@ subroutine ocpl_pop_init( p2x_p, p2x_2d_p, p2x_3d_p)
    p2x_2d_p%rAttr(:,:) = 1.0e30
 
    !----- init 3d fields specifically for pop->roms coupling -----
-   write(o_logunit,'(2a,i4)') subName,"     nlev_p    = ",nlev_p
+   if(master) write(o_logunit,'(2a,i4)') subName,"     nlev_p    = ",nlev_p
    allocate(p2x_3d_p(nlev_p))
 
    do k = 1, nlev_p
@@ -177,7 +177,7 @@ subroutine ocpl_pop_init( p2x_p, p2x_2d_p, p2x_3d_p)
    call mct_aVect_init(r2x_2d_p, rList=ocpl_fields_r2x_2d_fields, lsize=lsize)
    call mct_aVect_zero(r2x_2d_p)
 
-   write(o_logunit,'(2a,i4)') subName,"     nlev_rp   = ",nlev_rp
+   if(master) write(o_logunit,'(2a,i4)') subName,"     nlev_rp   = ",nlev_rp
    allocate(r2x_3d_p(nlev_rp))
    do k = 1, nlev_rp
       call mct_aVect_init(r2x_3d_p(k), rList=ocpl_fields_r2x_3d_fields,lsize=lsize)
@@ -204,7 +204,7 @@ subroutine ocpl_pop_init( p2x_p, p2x_2d_p, p2x_3d_p)
       call flushm (o_logunit)
    end if
 
-   write(o_logunit,'(2a)') subname,"Exit"
+   if(master) write(o_logunit,'(2a)') subname,"Exit"
 
 end subroutine ocpl_pop_init
 
@@ -259,9 +259,9 @@ subroutine ocpl_pop_import(p2x_p)   ! p2x_p used to put temporary debug fields o
    dbug_save = dbug ! debug this routine (only?)
    if (first_call) dbug = 2
 
-   if (dbug > 0) write(o_logunit,'(2a)') subName,"Enter" ; call shr_sys_flush(o_logunit)
+   if (master .or. dbug > 0) write(o_logunit,'(2a)') subName,"Enter" 
 
-   if (dbug > 1) then !----- optional debug info -----
+   if (master .or. dbug > 1) then !----- optional debug info -----
       write(o_logunit,'(2a,2e12.3)') subName,"min/max r2x_2d_p%rAttr(k_r2x_2d_wgts,      :)) = " &
                                     ,minval(r2x_2d_p   %rAttr(k_r2x_2d_wgts   ,:)) &
                                     ,maxval(r2x_2d_p   %rAttr(k_r2x_2d_wgts   ,:))
@@ -275,10 +275,9 @@ subroutine ocpl_pop_import(p2x_p)   ! p2x_p used to put temporary debug fields o
                                     ,minval(r2x_3d_p(1)%rAttr(k_r2x_3d_So_salt,:)) &
                                     ,maxval(r2x_3d_p(1)%rAttr(k_r2x_3d_So_salt,:))
       write(o_logunit,'(2a,i3)'    ) subName,"nblocks_clinic = ",nblocks_clinic
-      call shr_sys_flush(o_logunit)
    end if
 
-   if (first_call) write(o_logunit,'(2a,L2)') subName,"pop 3d restoring = ",pop_restoring
+   if (master .and. first_call) write(o_logunit,'(2a,L2)') subName,"pop 3d restoring = ",pop_restoring
 
    if (pop_restoring) then 
    !! Sep/17/2021: In the previous version of this program, n=0 step was done within the do loop on "iblock".
@@ -311,7 +310,7 @@ subroutine ocpl_pop_import(p2x_p)   ! p2x_p used to put temporary debug fields o
       ! one-time setup of restoring depth and timescale
       !-----------------------------------------------------------------------------------
       if (first_call) then 
-         write(o_logunit,'(2a)') subName,"first call: set restoring max levels and rtau"
+         if(master) write(o_logunit,'(2a)') subName,"first call: set restoring max levels and rtau"
 
          n = n_save ! Sep/20/2021: Use the maximum value from last iteration
          do j=this_block%jb,this_block%je
@@ -332,14 +331,14 @@ subroutine ocpl_pop_import(p2x_p)   ! p2x_p used to put temporary debug fields o
                !----- restoring depth limited to surface layer near coast -----
                nCellsFromCoast = PT_RESTORE_MAX_LEVEL(i,j,iblock) ! on input max level identifies coastal cells
                if (nCellsFromCoast < 1) then
-                  write(o_logunit,'(2a,2i6,a   )') subName,"i,j =",i,j,", land cell"
+                  if(master) write(o_logunit,'(2a,2i6,a   )') subName,"i,j =",i,j,", land cell"
                   PT_RESTORE_MAX_LEVEL(i,j,iblock) = 0
                else if (nCellsFromCoast < 4) then
-                  write(o_logunit,'(2a,2i6,a,i6)') subName,"i,j =",i,j,", coastal cell, distance from coast =",nCellsFromCoast
+                  if(master) write(o_logunit,'(2a,2i6,a,i6)') subName,"i,j =",i,j,", coastal cell, distance from coast =",nCellsFromCoast
                   PT_RESTORE_MAX_LEVEL(i,j,iblock) = min(nCellsFromCoast,int(r2x_2d_p%rAttr(k_r2x_2d_reslev,n) ))
                 ! PT_RESTORE_MAX_LEVEL(i,j,iblock) = 1 ! limit PT restoring to surface layer only (?)
                else
-                  write(o_logunit,'(2a,2i6,a   )') subName,"i,j =",i,j,", cells from coast > 3"
+                  if(master) write(o_logunit,'(2a,2i6,a   )') subName,"i,j =",i,j,", cells from coast > 3"
                   PT_RESTORE_MAX_LEVEL(i,j,iblock) = max(1,int(r2x_2d_p%rAttr(k_r2x_2d_reslev,n) ))
                end if
 
@@ -398,7 +397,7 @@ subroutine ocpl_pop_import(p2x_p)   ! p2x_p used to put temporary debug fields o
       !-----------------------------------------------------------------------------------
       ! optional debug info
       !-----------------------------------------------------------------------------------
-      if (dbug > 1) then
+      if (master .or. dbug > 1) then
          write(o_logunit,'(2a,2e12.3)') subName,"after min/max PT_RESTORE_RTAU = ",minval(PT_RESTORE_RTAU     (:,:  ,iblock)  ) &
                                                                                   ,maxval(PT_RESTORE_RTAU     (:,:  ,iblock)  )
          write(o_logunit,'(2a,2e12.3)') subName,"after min/max  S_RESTORE_RTAU = ",minval( S_RESTORE_RTAU     (:,:  ,iblock)  ) &
@@ -477,7 +476,7 @@ subroutine ocpl_pop_export( p2x_2d_p, p2x_3d_p)
 !  Q: do pop velocities need to be rotated?
 !------------------------------------------------------------------------------
 
-   write(o_logunit,'(2a)') subname,"Enter" ; call flushm (o_logunit)
+   if(master) write(o_logunit,'(2a)') subname,"Enter" ; call flushm (o_logunit)
 
    n = 0
    do iblock = 1,nblocks_clinic
@@ -568,7 +567,7 @@ subroutine ocpl_pop_export( p2x_2d_p, p2x_3d_p)
       call flushm (o_logunit)
    end if
 
-   write(o_logunit,'(2a)') subname,"Exit" ; call flushm (o_logunit)
+   if(master) write(o_logunit,'(2a)') subname,"Exit" 
 
 end subroutine ocpl_pop_export
 

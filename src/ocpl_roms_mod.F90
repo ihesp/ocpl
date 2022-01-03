@@ -111,7 +111,7 @@ subroutine ocpl_roms_init()
 !  initialize roms curtain BC data types 
 !-------------------------------------------------------------------------------
 
-   write(o_logunit,F09) "Enter" ;  call shr_sys_flush(o_logunit)
+   if(master) write(o_logunit,F09) "Enter" 
    if (debug>0) write(o_logunit,'(2a,i3)') subName,"debug level = ",debug
 
    ! get local sizes from ROMS parameters
@@ -125,22 +125,23 @@ subroutine ocpl_roms_init()
    globalSize  = globalISize * globalJSize
 
    nlev_r = ROMS_levels(nestID)
-
-   write(o_logunit,*) subName,"myRank   = ",MyRank
-   write(o_logunit,*) subName,"nlev_r   = ",nlev_r
-   write(o_logunit,*) subName,"mpicom_r = ",mpicom_r
-   write(o_logunit,*) subName,"OCNID_r  = ",OCNID_r 
-   write(o_logunit,*) subName,"global ni,nj,n = ",globalISize,globalJSize,globalSize 
-   write(o_logunit,*) subName,"local  ni,nj,n = ",localISize , localJSize, localSize
-   write(o_logunit,*) subName,"nlev_r         = ",nlev_r 
+   if(master) then
+      write(o_logunit,*) subName,"myRank   = ",MyRank
+      write(o_logunit,*) subName,"nlev_r   = ",nlev_r
+      write(o_logunit,*) subName,"mpicom_r = ",mpicom_r
+      write(o_logunit,*) subName,"OCNID_r  = ",OCNID_r 
+      write(o_logunit,*) subName,"global ni,nj,n = ",globalISize,globalJSize,globalSize 
+      write(o_logunit,*) subName,"local  ni,nj,n = ",localISize , localJSize, localSize
+      write(o_logunit,*) subName,"nlev_r         = ",nlev_r 
 
    !--------------------------------------------------------------------------------------
-   write(o_logunit,*) subName,"init curtain gsMaps" ; call shr_sys_flush(o_logunit)
+      write(o_logunit,*) subName,"init curtain gsMaps" 
+   endif
    !--------------------------------------------------------------------------------------
    call ocpl_roms_gsMapInit(mpicom_r, OCNID_r)
 
    !--------------------------------------------------------------------------------------
-   write(o_logunit,*) subName,"init curtain aVects" ; call shr_sys_flush(o_logunit)
+   if(master) write(o_logunit,*) subName,"init curtain aVects" 
    !--------------------------------------------------------------------------------------
 
    ! allocate pop->roms curtain attribute vectors arrays
@@ -185,11 +186,10 @@ subroutine ocpl_roms_init()
       else
          write(o_logUnit,F03) "check south curtain... lSize=0 => interior tile"
       end if
-      call shr_sys_flush(6)
    end if
 
    !--------------------------------------------------------------------------------------
-   write(o_logunit,*) subName,"init curtain data arrays" ; call shr_sys_flush(o_logunit)
+   if(master) write(o_logunit,*) subName,"init curtain data arrays" 
    !--------------------------------------------------------------------------------------
 
    BOUNDARY_OCPL(nestID) % bypass     = .true.  ! tell roms NOT to use this data
@@ -227,7 +227,7 @@ subroutine ocpl_roms_init()
    BOUNDARY_OCPL(nestID) % newdata    = .false.
 
    !--------------------------------------------------------------------------------------
-   write(o_logunit,*) subName,"init 3d export aVects" ; call shr_sys_flush(o_logunit)
+   if(master) write(o_logunit,*) subName,"init 3d export aVects" 
    !--------------------------------------------------------------------------------------
    lsize = mct_gsMap_lsize(gsMap_r, mpicom_r)
 
@@ -254,7 +254,7 @@ subroutine ocpl_roms_init()
 
    r2x_2d_r%rAttr(k_r2x_2d_frac,:) = 1.0_r8
 
-   write(o_logunit,'(2a)') subname,"Exit" ;  call shr_sys_flush(o_logunit)
+   if(master) write(o_logunit,'(2a)') subname,"Exit" 
 
 end subroutine ocpl_roms_init
 
@@ -297,7 +297,7 @@ subroutine ocpl_roms_export()
 !
 !-----------------------------------------------------------------------------------------
 
-   if (debug>1) write(o_logunit,'(a)') "Enter" ;  call shr_sys_flush(o_logunit)
+   if (master .or. debug>1) write(o_logunit,'(a)') "Enter" 
 
    ids = BOUNDS(nestID)%IstrR(ocn_tile)
    ide = BOUNDS(nestID)%IendR(ocn_tile)
@@ -315,7 +315,7 @@ subroutine ocpl_roms_export()
       end do
    end do
 
-   if (debug>2) then
+   if (master .or. debug>2) then
       k = nlev_r
          write(o_logUnit,*) subname,"DEBUG> nestID,tile,t-indx  = ",nestID,ocn_tile,nnew(nestID)
          write(o_logUnit,*) subname,"DEBUG> jds,jed,ids,ide= ",jds,jde,ids,ide
@@ -455,7 +455,7 @@ subroutine ocpl_roms_import()
                   ju = globalJSize0(nestID) + 1                     ! uses Jend
                   jv = globalJSize0(nestID) + 1                     ! uses Jend and Jend-1
                endif
-               write(o_logunit,*) "Inside ocpl_roms_import iu=",iu," iv=",iv," ju=",ju," jv=",jv," k=",k," my rank=",MyRank," ij:",ij
+               if(master) write(o_logunit,*) "Inside ocpl_roms_import iu=",iu," iv=",iv," ju=",ju," jv=",jv," k=",k," my rank=",MyRank," ij:",ij
                ubar   = 0.0_R8
                vbar   = 0.0_R8
                udepth = 0.0_R8
@@ -614,7 +614,7 @@ subroutine ocpl_roms_import()
    enddo
 
   !--- check values of global gather/broadcast ---
-   if (debug>0 ) then
+   if (master .or. debug>0 ) then
       do k = 1,4  ! for each curtain: N,E,S,W
          if ((k==k_Scurtain .and. do_Scurtain==.true.) .or. &
              (k==k_Ecurtain .and. do_Ecurtain==.true.) .or. &
@@ -770,7 +770,7 @@ end subroutine ocpl_roms_import
 ! surface forcing aVect gsMaps are created by roms component
 !-------------------------------------------------------------------------------
 
-   write(o_logunit,'(2a)') subname,"Enter" ;  call shr_sys_flush(o_logunit)
+   if(master .or. debug >0) write(o_logunit,'(2a)') subname,"Enter" 
    if (debug>0) write(o_logunit,'(2a,i3)') subName,"debug level = ",debug
 
    allocate(gsMap_rc(4)) ! allocate for four BC curtains
@@ -792,7 +792,7 @@ end subroutine ocpl_roms_import
    else
       call mct_gsMap_init(gsMap_rc(k), indx, comm, compid,        0  , globalJSize)
    endif
-   write(o_logunit,*) subName,"west : size global, local = ", &
+   if(master) write(o_logunit,*) subName,"west : size global, local = ", &
             mct_gsMap_gsize(gsMap_rc(k)),mct_gsMap_lsize(gsMap_rc(k),comm)
    deallocate(indx)
 
@@ -813,7 +813,7 @@ end subroutine ocpl_roms_import
    else
       call mct_gsMap_init(gsMap_rc(k), indx, comm, compid,        0  , globalISize)
    endif
-   write(o_logunit,*) subName,"north: size global, local = ", &
+   if(master) write(o_logunit,*) subName,"north: size global, local = ", &
             mct_gsMap_gsize(gsMap_rc(k)),mct_gsMap_lsize(gsMap_rc(k),comm)
    deallocate(indx)
 
@@ -834,7 +834,7 @@ end subroutine ocpl_roms_import
    else
       call mct_gsMap_init(gsMap_rc(k), indx, comm, compid,        0  , globalJSize)
    endif
-   write(o_logunit,*) subName,"east : size global, local = ", &
+   if(master) write(o_logunit,*) subName,"east : size global, local = ", &
             mct_gsMap_gsize(gsMap_rc(k)),mct_gsMap_lsize(gsMap_rc(k),comm)
    deallocate(indx)
 
@@ -855,11 +855,11 @@ end subroutine ocpl_roms_import
    else
       call mct_gsMap_init(gsMap_rc(k), indx, comm, compid,        0  , globalISize)
    endif
-   write(o_logunit,*) subName,"south: size global, local = ", &
+   if(master) write(o_logunit,*) subName,"south: size global, local = ", &
             mct_gsMap_gsize(gsMap_rc(k)),mct_gsMap_lsize(gsMap_rc(k),comm)
    deallocate(indx)
 
-   write(o_logunit,'(2a)') subname,"Exit" ;  call shr_sys_flush(o_logunit)
+   if(master) write(o_logunit,'(2a)') subname,"Exit" ;  call shr_sys_flush(o_logunit)
 
 end subroutine ocpl_roms_gsMapInit
 
