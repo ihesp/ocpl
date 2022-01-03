@@ -64,7 +64,7 @@ module ocn_comp_mct
 ! ! PRIVATE DATA:
 
    integer(IN) :: shrlogunit,shrloglev  ! to save & restore shared log units & levels
-   integer(IN) :: debug = 1             ! debug level
+   integer(IN) :: debug = 0            ! debug level
 
 !=========================================================================================
 contains

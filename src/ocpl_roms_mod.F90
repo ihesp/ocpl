@@ -26,7 +26,7 @@ module ocpl_roms_mod
                            globalJSize0 => Mm,  &
                            ROMS_levels  => N,   &
                            BOUNDS
-   use mod_parallel, only: MyRank
+   use mod_parallel, only: MyRank, master
    use communicate,  only: master_task,my_task
 
    use mct_mod
@@ -392,7 +392,7 @@ subroutine ocpl_roms_import()
 !  note: roms uses BC temperature units of Celcius (not Kelvin)
 !-------------------------------------------------------------------------------
 
-   write(o_logunit,'(2a)') subname,"Enter" ;  call shr_sys_flush(o_logunit)
+   if(master .or. debug>0) write(o_logunit,'(2a)') subname,"Enter" 
    if (debug>0) write(o_logunit,'(2a,i3)') subName,"debug level = ",debug
 
    !--------------------------------------------------------------------------------------
@@ -728,7 +728,7 @@ subroutine ocpl_roms_import()
       end if
    enddo
 
-   write(o_logunit,'(2a)') subname,"Exit" ;  call shr_sys_flush(o_logunit)
+   if(master .or. debug>0) write(o_logunit,'(2a)') subname,"Exit" 
 
 end subroutine ocpl_roms_import
 
