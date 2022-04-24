@@ -43,29 +43,22 @@ def _build_ocpl():
        print("<ocpl:_build_ocpl> lid      = %s" %  lid       )
 
        # my_file is the full path name of the buildlib that you are calling
-       my_file = os.path.join(srcroot, "components", "pop", "cime_config", "buildlib") 
-       # same args received by ocpl buildlib are sent to pop's buildlib
-       cmd_line_args = " {} {} {}".format(caseroot,libroot,bldroot)
+       my_file = os.path.join(srcroot, "components", "pop", "cime_config", "buildlib")
+
+       print("libroot {} bldroot {}".format(libroot, bldroot+".pop"))
+       if not os.path.exists(bldroot+".pop"):
+           os.makedirs(bldroot+".pop")
+
+       cmd_line_args = " {} {} {}".format(caseroot,libroot,bldroot+".pop")
 
        print("<ocpl:_build_ocpl> my_file     = %s" % my_file   )
        print("<ocpl:_build_ocpl> cmd_lin_args= %s" % cmd_line_args)
 
-       run_sub_or_cmd(my_file, [cmd_line_args],'dontfind',[bldroot,libroot,caseroot])
-#      rc,stdout,stderr = run_sub_or_cmd(my_file, [cmd_line_args                      ], 
-#                                      'dontfind',[bldroot      , libroot   , caseroot])
-#      expect(rc == 0, "pop buildlib failure")
+       run_sub_or_cmd(my_file, [cmd_line_args],'dontfind',[bldroot+".pop",libroot,caseroot])
 
-       #---- "hide" pop Filepath, etc., as obj dir is shared by other builds ---
        objroot = case.get_value("OBJROOT")
-       filepath_file  = os.path.join(objroot,"ocn","obj","Filepath")
-       depends_file   = os.path.join(objroot,"ocn","obj","Depends")
-       deppath_file   = os.path.join(objroot,"ocn","obj","Deppath")
-       filepath_file0 = os.path.join(objroot,"ocn","obj","Filepath.pop")
-       depends_file0  = os.path.join(objroot,"ocn","obj", "Depends.pop")
-       deppath_file0  = os.path.join(objroot,"ocn","obj", "Deppath.pop")
-       os.rename(filepath_file,filepath_file0)
-       os.rename(depends_file , depends_file0)
-       os.rename(deppath_file , deppath_file0)
+       if not os.path.isdir(objroot):
+           os.makedirs(objroot)
 
     logger.info("-----------------------------------------------------------------")
     logger.info("ocpl buildlib calling roms buildlib...")
@@ -83,36 +76,16 @@ def _build_ocpl():
        print("<ocpl:_build_ocpl> lid      = %s" %  lid       )
 
        # my_file is the full path name of the buildlib that you are calling
-       my_file = os.path.join(srcroot, "components", "roms", "cime_config", "buildlib") 
+       my_file = os.path.join(srcroot, "components", "roms", "cime_config", "buildlib")
        # same args received by ocpl buildlib are sent to pop's buildlib
-       cmd_line_args = " {} {} {}".format(caseroot,libroot,bldroot)
+       cmd_line_args = " {} {} {}".format(caseroot,libroot,bldroot+".roms")
 
        print("<ocpl:_build_ocpl> my_file     = %s" % my_file   )
        print("<ocpl:_build_ocpl> cmd_lin_args= %s" % cmd_line_args)
 
        run_sub_or_cmd(my_file, [cmd_line_args],'dontfind',[bldroot,libroot,caseroot])
-#                                      'dontfind',[bldroot      , libroot   , caseroot])
-#      rc,stdout,stderr = run_sub_or_cmd(my_file, [cmd_line_args                      ], 
-#                                      'dontfind',[bldroot      , libroot   , caseroot])
-#      expect(rc == 0, "roms buildlib failure")
 
        #---- "hide" roms Filepath, etc., as obj dir is shared by other builds ---
-       objroot = case.get_value("OBJROOT")
-       filepath_file  = os.path.join(objroot,"ocn","obj","Filepath")
-       depends_file   = os.path.join(objroot,"ocn","obj","Depends")
-       deppath_file   = os.path.join(objroot,"ocn","obj","Deppath")
-       makedep_file   = os.path.join(objroot,"ocn","obj","MakeDepend")
-       srcfile_file   = os.path.join(objroot,"ocn","obj","Srcfiles")
-       filepath_file0 = os.path.join(objroot,"ocn","obj",  "Filepath.roms")
-       depends_file0  = os.path.join(objroot,"ocn","obj",   "Depends.roms")
-       deppath_file0  = os.path.join(objroot,"ocn","obj",   "Deppath.roms")
-       makedep_file0  = os.path.join(objroot,"ocn","obj","MakeDepend.roms")
-       srcfile_file0  = os.path.join(objroot,"ocn","obj",  "Srcfiles.roms")
-       os.rename(filepath_file,filepath_file0)
-       os.rename(depends_file , depends_file0)
-       os.rename(deppath_file , deppath_file0)
-       os.rename(makedep_file , makedep_file0)
-       os.rename(srcfile_file , srcfile_file0)
 
     logger.info("-----------------------------------------------------------------")
     logger.info("ocpl buildlib building ocpl...")
@@ -126,61 +99,32 @@ def _build_ocpl():
         gmake     = case.get_value("GMAKE")
         srcroot   = case.get_value("SRCROOT")
 
-#       # call buildcpp  to set the cppdefs
-#       cmd = os.path.join(os.path.join(srcroot,"components","ocpl","cime_config","buildcpp"))
-#       logger.info("     ...calling ocpl buildcpp to set build time options")
-#       try:
-#           mod = imp.load_source("buildcpp", cmd)
-#           ocpl_cppdefs = mod.buildcpp(case)
-#       except:
-#           raise
-
         # create Filepath file
         #---- "hide" pop Filepath, etc., as obj dir is shared by ocpl, pop ---
-        objroot = case.get_value("OBJROOT")
         filepath_file = os.path.join(objroot,"ocn","obj","Filepath")
-        depends_file = os.path.join(objroot,"ocn","obj","Depends")
-        deppath_file = os.path.join(objroot,"ocn","obj","Deppath")
         if not os.path.isfile(filepath_file):
             srcroot = case.get_value("SRCROOT")
             caseroot = case.get_value("CASEROOT")
-            paths = [os.path.join(caseroot,"SourceMods","src.ocpl"), 
+            paths = [os.path.join(caseroot,"SourceMods","src.ocpl"),
                      os.path.join(srcroot,"components","ocpl","src")]
             with open(filepath_file, "w") as filepath:
                 filepath.write("\n".join(paths))
                 filepath.write("\n")
-        srcroot = case.get_value("SRCROOT")
-        caseroot = case.get_value("CASEROOT")
-        paths = [os.path.join(caseroot,"SourceMods","src.ocpl"), 
-                 os.path.join(srcroot,"components","ocpl","src")]
-        with open(filepath_file, "w") as filepath:
-            filepath.write("\n".join(paths))
-            filepath.write("\n")
 
         # build the library
-        complib = os.path.join(libroot,"libocn.a")
+        complib = os.path.join(libroot,"libocpl.a")
         makefile = os.path.join(casetools, "Makefile")
 
 #       cmd = "%s complib -j %d MODEL=ocpl COMPLIB=%s -f %s USER_CPPDEFS=\"%s\"" \
 #           % (gmake, gmake_j, complib, makefile, ocpl_cppdefs )
-        cmd = "%s complib -j %d MODEL=ocpl COMPLIB=%s -f %s                    " \
-            % (gmake, gmake_j, complib, makefile               )
+        ocpl_cppdefs = "-I{bldroot} -I{bldroot}.roms -I{bldroot}.pop".format(bldroot=bldroot)
+        cmd = "{} complib -j {} MODEL=ocpl USER_CPPDEFS=\"{}\" COMPLIB={} -f {} " \
+              .format(gmake, gmake_j, ocpl_cppdefs, complib, makefile)
 
-        rc, out, err = run_cmd(cmd, from_dir=bldroot)
+        rc, out, err = run_cmd(cmd, from_dir=bldroot, verbose=True)
         expect(rc == 0, "Command %s failed rc=%d\nout=%s\nerr=%s" % (cmd, rc, out, err))
 
         logger.info("Command %s completed with output %s\nerr %s" ,cmd, out, err)
-
-        #---- "hide" ocpl Filepath, etc., as obj dir is shared by other builds ---
-        filepath_file  = os.path.join(objroot,"ocn","obj","Filepath")
-        depends_file   = os.path.join(objroot,"ocn","obj","Depends")
-        deppath_file   = os.path.join(objroot,"ocn","obj","Deppath")
-        filepath_file0 = os.path.join(objroot,"ocn","obj","Filepath.ocpl")
-        depends_file0  = os.path.join(objroot,"ocn","obj", "Depends.ocpl")
-        deppath_file0  = os.path.join(objroot,"ocn","obj", "Deppath.ocpl")
-        os.rename(filepath_file,filepath_file0)
-        os.rename(depends_file , depends_file0)
-        os.rename(deppath_file , deppath_file0)
 
 ###############################################################################
 

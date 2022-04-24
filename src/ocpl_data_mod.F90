@@ -10,12 +10,10 @@ module ocpl_data_mod
 !    2018-Oct: first version by Brian Kauffman 
 !=========================================================================================
 
-   use mct_mod
-!  use shr_kind_mod, only: IN=>SHR_KIND_IN, R8=>SHR_KIND_R8, CS=>SHR_KIND_CS, CL=>SHR_KIND_CL
+   use mct_mod, only: mct_aVect, mct_gsmap, mct_ggrid
    use shr_kind_mod, only: IN=>SHR_KIND_IN,                  CS=>SHR_KIND_CS, CL=>SHR_KIND_CL
-   use shr_mct_mod
-   use seq_infodata_mod
-   use seq_cdata_mod
+   use seq_infodata_mod, only: seq_infodata_type
+   use seq_cdata_mod, only : seq_cdata
 
    implicit none
    public                 ! default is data public, that's the point of this module

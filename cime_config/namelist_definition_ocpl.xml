@@ -9,15 +9,391 @@
       Currently ocpl doesn't need any namelist input
   -->
 
-  <entry id="foobar">
-    <type>real</type>
+  <entry id="domainfile">
+    <type>char</type>
     <category>ocpl</category>
     <group>ocpl_nml</group>
     <desc>
-      not needed, just an example of a namelist variable
+      ocpl domain file
     </desc>
     <values>
-      <value>123.4</value>
+      <value>$DIN_LOC_ROOT/share/domains/domain.ocn.gst03_tx0.1v3.210514.nc</value>
+    </values>
+  </entry>
+  <entry id="latname">
+    <type>char</type>
+    <category>ocpl</category>
+    <group>ocpl_nml</group>
+    <desc>
+      ocpl domain file latitude variable name
+    </desc>
+    <values>
+      <value>yc</value>
+    </values>
+  </entry>
+
+  <entry id="lonname">
+    <type>char</type>
+    <category>ocpl</category>
+    <group>ocpl_nml</group>
+    <desc>
+      ocpl domain file longitude variable name
+    </desc>
+    <values>
+      <value>xc</value>
+    </values>
+  </entry>
+  <entry id="maskname">
+    <type>char</type>
+    <category>ocpl</category>
+    <group>ocpl_nml</group>
+    <desc>
+      ocpl domain file mask variable name
+    </desc>
+    <values>
+      <value>mask</value>
+    </values>
+  </entry>
+
+  <entry id="areaname">
+    <type>char</type>
+    <category>ocpl</category>
+    <group>ocpl_nml</group>
+    <desc>
+      ocpl domain file area variable name
+    </desc>
+    <values>
+      <value>area</value>
+    </values>
+  </entry>
+
+  <entry id="fracname">
+    <type>char</type>
+    <category>ocpl</category>
+    <group>ocpl_nml</group>
+    <desc>
+      ocpl domain file land fraction variable name
+    </desc>
+    <values>
+      <value>frac</value>
+    </values>
+  </entry>
+
+  <entry id="decomp">
+    <type>char</type>
+    <category>ocpl</category>
+    <group>ocpl_nml</group>
+    <desc>
+      ocpl decomp type
+    </desc>
+    <values>
+      <value>2d1d</value>
+    </values>
+  </entry>
+
+  <entry id="readfrac">
+    <type>logical</type>
+    <category>ocpl</category>
+    <group>ocpl_nml</group>
+    <desc>
+      ocpl 
+    </desc>
+    <values>
+      <value>False</value>
+    </values>
+  </entry>
+
+<!-- ocpl_maps.rc -->
+
+  <entry id="pop2ocpl_file">
+    <type>char</type>
+    <category>mapping</category>
+    <input_pathname>abs</input_pathname>
+    <group>ocpl_maps</group>
+    <desc>
+      pop to ocpl flux mapping file for fluxes
+    </desc>
+    <values>
+      <value>cpl/gridmaps/gst03_to_tx0.1/map.tx0.1v3_to_gst03_tx0.1v3_nn.210208.nc</value>
+    </values>
+  </entry>
+
+  <entry id="pop2ocpl_type">
+    <type>char</type>
+    <category>mapping</category>
+    <group>ocpl_maps</group>
+    <desc>
+      The type of mapping desired, either "source" or "destination" mapping.                                                                                       
+      X is associated with rearrangement of the source grid to the
+      destination grid and then local mapping.  Y is associated with mapping
+      on the source grid and then rearrangement and sum to the destination grid.
+    </desc>
+    <values>
+      <value>X</value>
+    </values>
+  </entry>
+
+  <entry id="ocpl2pop_file">
+    <type>char</type>
+    <category>mapping</category>
+    <input_pathname>abs</input_pathname>
+    <group>ocpl_maps</group>
+    <desc>
+      ocpl to pop flux mapping file for fluxes      
+    </desc>
+    <values>
+      <value>cpl/gridmaps/gst03_to_tx0.1/map.gst03_tx0.1v3_to_tx0.1v3_nn.210208.nc</value>
+    </values>
+  </entry>
+
+  <entry id="ocpl2pop_type">
+    <type>char</type>
+    <category>mapping</category>
+    <group>ocpl_maps</group>
+    <desc>                                                                      
+    The type of mapping desired, either "source" or "destination" mapping.
+    X is associated with rearrangement of the source grid to the
+    destination grid and then local mapping.  Y is associated with mapping
+    on the source grid and then rearrangement and sum to the destination
+    grid.
+    </desc>
+    <values>
+      <value>X</value>
+    </values>
+  </entry>
+
+  <entry id="roms2ocpl_file">
+    <type>char</type>
+    <category>mapping</category>
+    <input_pathname>abs</input_pathname>
+    <group>ocpl_maps</group>
+    <desc>                                                                                                                               
+     roms to ocpl flux mapping file for fluxes
+    </desc>
+    <values>
+      <value>cpl/gridmaps/gst03_to_tx0.1/map.gst03_to_gst03_tx0.1v3_nn.210208.nc</value>
+    </values>
+  </entry>
+
+  <entry id="roms2ocpl_type">
+    <type>char</type>
+    <category>mapping</category>
+    <group>ocpl_maps</group>
+    <desc>                                                                                                                                                          
+    The type of mapping desired, either "source" or "destination" mapping.
+    X is associated with rearrangement of the source grid to the
+    destination grid and then local mapping.  Y is associated with mapping
+    on the source grid and then rearrangement and sum to the destination
+    grid.
+    </desc>
+    <values>
+      <value>X</value>
+    </values>
+  </entry>
+
+  <entry id="ocpl2roms_file">
+    <type>char</type>
+    <category>mapping</category>
+    <input_pathname>abs</input_pathname>
+    <group>ocpl_maps</group>
+    <desc>                                                                                                                               
+     ocpl to roms flux mapping file for fluxes
+    </desc>
+    <values>
+      <value>cpl/gridmaps/gst03_to_tx0.1/map.gst03_tx0.1v3_to_gst03_nn.210208.nc</value>
+    </values>
+  </entry>
+
+  <entry id="ocpl2roms_type">
+    <type>char</type>
+    <category>mapping</category>
+    <group>ocpl_maps</group>
+    <desc>                                                                                                                                                          
+    The type of mapping desired, either "source" or "destination" mapping.
+    X is associated with rearrangement of the source grid to the
+    destination grid and then local mapping.  Y is associated with mapping
+    on the source grid and then rearrangement and sum to the destination
+    grid.
+    </desc>
+    <values>
+      <value>X</value>
+    </values>
+  </entry>
+
+  <entry id="roms2pop_file">
+    <type>char</type>
+    <category>mapping</category>
+    <input_pathname>abs</input_pathname>
+    <group>ocpl_maps</group>
+    <desc>                                                                                                                               
+     roms to pop flux mapping file for fluxes
+    </desc>
+    <values>
+      <value>cpl/gridmaps/gst03_to_tx0.1/map.gst03_to_tx0.1v3_aavg.210208.nc</value>
+    </values>
+  </entry>
+
+  <entry id="roms2pop_type">
+    <type>char</type>
+    <category>mapping</category>
+    <group>ocpl_maps</group>
+    <desc>                                                                                                                                                          
+    The type of mapping desired, either "source" or "destination" mapping.
+    X is associated with rearrangement of the source grid to the
+    destination grid and then local mapping.  Y is associated with mapping
+    on the source grid and then rearrangement and sum to the destination
+    grid.
+    </desc>
+    <values>
+      <value>X</value>
+    </values>
+  </entry>
+
+  <entry id="pop2roms_file">
+    <type>char</type>
+    <category>mapping</category>
+    <input_pathname>abs</input_pathname>
+    <group>ocpl_maps</group>
+    <desc>                                                                                                                               
+     pop to roms flux mapping file for fluxes
+    </desc>
+    <values>
+      <value>cpl/gridmaps/gst03_to_tx0.1/map.tx0.1v3_to_gst03_bilinex.210208.nc</value>
+    </values>
+  </entry>
+
+  <entry id="pop2roms_type">
+    <type>char</type>
+    <category>mapping</category>
+    <group>ocpl_maps</group>
+    <desc>                                                                                                                                                          
+    The type of mapping desired, either "source" or "destination" mapping.
+    X is associated with rearrangement of the source grid to the
+    destination grid and then local mapping.  Y is associated with mapping
+    on the source grid and then rearrangement and sum to the destination
+    grid.
+    </desc>
+    <values>
+      <value>X</value>
+    </values>
+  </entry>
+
+  <entry id="pop2roms_Wcurtain_file">
+    <type>char</type>
+    <category>mapping</category>
+    <input_pathname>abs</input_pathname>
+    <group>ocpl_maps</group>
+    <desc>                                                                                                                               
+     ocpl to roms flux mapping file for fluxes
+    </desc>
+    <values>
+      <value>cpl/gridmaps/gst03_to_tx0.1/map.tx0.1v3_to_gst03_west_bilinex.210208.nc</value>
+    </values>
+  </entry>
+
+  <entry id="pop2roms_Wcurtain_type">
+    <type>char</type>
+    <category>mapping</category>
+    <group>ocpl_maps</group>
+    <desc>                                                                                                                                                          
+    The type of mapping desired, either "source" or "destination" mapping.
+    X is associated with rearrangement of the source grid to the
+    destination grid and then local mapping.  Y is associated with mapping
+    on the source grid and then rearrangement and sum to the destination
+    grid.
+    </desc>
+    <values>
+      <value>X</value>
+    </values>
+  </entry>
+
+
+  <entry id="pop2roms_Ncurtain_file">
+    <type>char</type>
+    <category>mapping</category>
+    <input_pathname>abs</input_pathname>
+    <group>ocpl_maps</group>
+    <desc>                                                                                                                               
+     ocpl to roms flux mapping file for fluxes
+    </desc>
+    <values>
+      <value>cpl/gridmaps/gst03_to_tx0.1/map.tx0.1v3_to_gst03_north_bilinex.210208.nc</value>
+    </values>
+  </entry>
+
+  <entry id="pop2roms_Ncurtain_type">
+    <type>char</type>
+    <category>mapping</category>
+    <group>ocpl_maps</group>
+    <desc>                                                                                                                                                          
+    The type of mapping desired, either "source" or "destination" mapping.
+    X is associated with rearrangement of the source grid to the
+    destination grid and then local mapping.  Y is associated with mapping
+    on the source grid and then rearrangement and sum to the destination
+    grid.
+    </desc>
+    <values>
+      <value>Y</value>
+    </values>
+  </entry>
+
+
+  <entry id="pop2roms_Ecurtain_file">
+    <type>char</type>
+    <category>mapping</category>
+    <input_pathname>abs</input_pathname>
+    <group>ocpl_maps</group>
+    <desc>                                                                                                                               
+     ocpl to roms flux mapping file for fluxes
+    </desc>
+    <values>
+      <value>cpl/gridmaps/gst03_to_tx0.1/map.tx0.1v3_to_gst03_east_bilinex.210208.nc</value>
+    </values>
+  </entry>
+
+  <entry id="pop2roms_Ecurtain_type">
+    <type>char</type>
+    <category>mapping</category>
+    <group>ocpl_maps</group>
+    <desc>                                                                                                                                                          
+    The type of mapping desired, either "source" or "destination" mapping.
+    X is associated with rearrangement of the source grid to the
+    destination grid and then local mapping.  Y is associated with mapping
+    on the source grid and then rearrangement and sum to the destination
+    grid.
+    </desc>
+    <values>
+      <value>X</value>
+    </values>
+  </entry>
+
+
+  <entry id="pop2roms_Scurtain_file">
+    <type>char</type>
+    <category>mapping</category>
+    <input_pathname>abs</input_pathname>
+    <group>ocpl_maps</group>
+    <desc>                                                                                                                               
+     ocpl to roms flux mapping file for fluxes
+    </desc>
+    <values>
+      <value>cpl/gridmaps/gst03_to_tx0.1/map.tx0.1v3_to_gst03_south_bilinex.210208.nc</value>
+    </values>
+  </entry>
+
+  <entry id="pop2roms_Scurtain_type">
+    <type>char</type>
+    <category>mapping</category>
+    <group>ocpl_maps</group>
+    <desc>                                                                                                                                                          
+    The type of mapping desired, either "source" or "destination" mapping.
+    X is associated with rearrangement of the source grid to the
+    destination grid and then local mapping.  Y is associated with mapping
+    on the source grid and then rearrangement and sum to the destination
+    grid.
+    </desc>
+    <values>
+      <value>Y</value>
     </values>
   </entry>
 

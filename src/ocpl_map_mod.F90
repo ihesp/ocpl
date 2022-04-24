@@ -5,11 +5,11 @@ module ocpl_map_mod
 
 !BOP
 ! !MODULE: ocpl_map_mod
-! 
+!
 ! !INTERFACE:
 
 ! !DESCRIPTION:
-!     This is the interface between ocpl and roms wrt exporting/importing 
+!     This is the interface between ocpl and roms wrt exporting/importing
 !     3d data for 3d coupling of an embedded regional model
 !
 ! !REVISION HISTORY:
@@ -27,14 +27,13 @@ module ocpl_map_mod
    use seq_cdata_mod
    use seq_infodata_mod
    use seq_timemgr_mod
-   use shr_file_mod 
+   use shr_file_mod
    use shr_cal_mod, only : shr_cal_date2ymd
    use shr_sys_mod
    use shr_mct_mod
    use mct_mod
-
    implicit none
-   private              ! all data private by default 
+   private              ! all data private by default
    SAVE                 ! save everything
 
 ! !PUBLIC MEMBER FUNCTIONS:
@@ -46,7 +45,7 @@ module ocpl_map_mod
 ! !PUBLIC DATA:
 
    !--- horizontal maps (2d) ---
-   type(mct_sMatp),public :: sMatp_o2p    ! maps ocpl -> pop 
+   type(mct_sMatp),public :: sMatp_o2p    ! maps ocpl -> pop
    type(mct_sMatp),public :: sMatp_p2o    ! maps pop  -> ocpl
 
    type(mct_sMatp),public :: sMatp_o2r    ! maps ocpl -> roms
@@ -58,10 +57,10 @@ module ocpl_map_mod
 ! !PRIVATE MODULE DATA:
 
    integer(IN),parameter :: debug  = 0    ! debug level
-   integer(IN),parameter :: nestID = 1    ! roms nest (grid/domain) #1 
+   integer(IN),parameter :: nestID = 1    ! roms nest (grid/domain) #1
 
    type(mct_sMatp)       :: sMatp_p2rc(4) ! curtain amps: pop -> roms (4-curtains: S,E,N,W)
-
+   logical :: master
 !=========================================================================================
 contains
 !=========================================================================================
@@ -95,95 +94,100 @@ subroutine ocpl_map_init()
    character(*),parameter :: configFile = "ocpl_maps.rc"
 
    character(*), parameter :: subName = "(ocpl_map_init) "
+   integer :: ierr, myrank
 
 !-----------------------------------------------------------------------------------------
-!  
+!
 !-----------------------------------------------------------------------------------------
+   call mpi_comm_rank(mpicom_p, myrank, ierr)
+   master = (myrank==0)
+   if(master .or. debug >0) write(o_logUnit,'(2a)') subname,"Enter" ;
 
-   write(o_logUnit,'(2a)') subname,"Enter" ;  call shr_sys_flush(o_logUnit)
-   write(o_logUnit,'(2a,i2)') subname,"debug level = ",debug
+
+
+   if(master .or. debug>0) write(o_logUnit,'(2a,i2)') subname,"debug level = ",debug
 
    !--------------------------------------------------------------------------------------
-   write(o_logUnit,*) subname,"Init pop<->roms curtain maps"
+   if(master .or. debug>0) write(o_logUnit,*) subname,"Init pop<->roms curtain maps"
    !--------------------------------------------------------------------------------------
 
    if (do_Scurtain) then
       k = k_Scurtain
       call shr_mct_queryConfigFile(mpicom_p,configFile, &
            "pop2roms_Scurtain_file:",mapfile,"pop2roms_Scurtain_type:",maptype)
-      write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
+      if(master) write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
       call shr_mct_sMatPInitnc(sMatp_p2rc(k),gsMap_p,gsMap_rc(k),trim(mapfile),trim(maptype),mpicom_p)
-   else
-      write(o_logUnit,'(2a)') subname,"do_Scurtain = false" ;  call shr_sys_flush(o_logUnit)
+   else if (master) then
+      write(o_logUnit,'(2a)') subname,"do_Scurtain = false" 
    end if
 
    if (do_Ecurtain) then
       k = k_Ecurtain
       call shr_mct_queryConfigFile(mpicom_p,configFile, &
            "pop2roms_Ecurtain_file:",mapfile,"pop2roms_Ecurtain_type:",maptype)
-      write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
+      if(master) write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
       call shr_mct_sMatPInitnc(sMatp_p2rc(k),gsMap_p,gsMap_rc(k),trim(mapfile),trim(maptype),mpicom_p)
-   else
-      write(o_logUnit,'(2a)') subname,"do_Ecurtain = false" ;  call shr_sys_flush(o_logUnit)
+   else if(master) then
+      write(o_logUnit,'(2a)') subname,"do_Ecurtain = false" 
    end if
 
    if (do_Ncurtain) then
       k = k_Ncurtain
       call shr_mct_queryConfigFile(mpicom_p,configFile, &
            "pop2roms_Ncurtain_file:",mapfile,"pop2roms_Ncurtain_type:",maptype)
-      write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
+      if(master) write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
       call shr_mct_sMatPInitnc(sMatp_p2rc(k),gsMap_p,gsMap_rc(k),trim(mapfile),trim(maptype),mpicom_p)
-   else
-      write(o_logUnit,'(2a)') subname,"do_Ncurtain = false" ;  call shr_sys_flush(o_logUnit)
+   else if(master) then
+      write(o_logUnit,'(2a)') subname,"do_Ncurtain = false" 
    end if
 
    if (do_Wcurtain) then
       k = k_Wcurtain
       call shr_mct_queryConfigFile(mpicom_p,configFile, &
            "pop2roms_Wcurtain_file:",mapfile,"pop2roms_Wcurtain_type:",maptype)
-      write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
+      if(master) write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
       call shr_mct_sMatPInitnc(sMatp_p2rc(k),gsMap_p,gsMap_rc(k),trim(mapfile),trim(maptype),mpicom_p)
-   else
-      write(o_logUnit,'(2a)') subname,"Wcurtain = false" ;  call shr_sys_flush(o_logUnit)
+   else if(master) then 
+      write(o_logUnit,'(2a)') subname,"Wcurtain = false" 
    end if
 
    !--------------------------------------------------------------------------------------
-   write(o_logUnit,*) subname,"Init ocpl<->pop  surface maps" 
+   if(master) write(o_logUnit,*) subname,"Init ocpl<->pop  surface maps"
    !--------------------------------------------------------------------------------------
 
    call shr_mct_queryConfigFile(mpicom_o,configFile,"ocpl2pop_file:",mapfile,"ocpl2pop_type:",maptype)
-   write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
+   if(master) write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
    call shr_mct_sMatPInitnc(sMatp_o2p,gsMap_o,gsMap_p,trim(mapfile),trim(maptype),mpicom_o)
 
    call shr_mct_queryConfigFile(mpicom_o,configFile,"pop2ocpl_file:",mapfile,"pop2ocpl_type:",maptype)
-   write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
+   if(master) write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
    call shr_mct_sMatPInitnc(sMatp_p2o,gsMap_p,gsMap_o,trim(mapfile),trim(maptype),mpicom_o)
 
    !--------------------------------------------------------------------------------------
-   write(o_logUnit,*) subname,"Init ocpl<->roms surface maps" 
+   if(master) write(o_logUnit,*) subname,"Init ocpl<->roms surface maps"
    !--------------------------------------------------------------------------------------
 
    call shr_mct_queryConfigFile(mpicom_o,configFile,"roms2ocpl_file:",mapfile,"roms2ocpl_type:",maptype)
-   write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
+   if(master) write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
    call shr_mct_sMatPInitnc(sMatp_r2o,gsMap_r,gsMap_o,trim(mapfile),trim(maptype),mpicom_o)
 
    call shr_mct_queryConfigFile(mpicom_o,configFile,"ocpl2roms_file:",mapfile,"ocpl2roms_type:",maptype)
-   write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
+   if(master) write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
    call shr_mct_sMatPInitnc(sMatp_o2r,gsMap_o,gsMap_r,trim(mapfile),trim(maptype),mpicom_o)
 
    !--------------------------------------------------------------------------------------
-   write(o_logUnit,*) subname,"Init pop<->roms surface maps" 
+   if(master) write(o_logUnit,*) subname,"Init pop<->roms surface maps"
    !--------------------------------------------------------------------------------------
 
    call shr_mct_queryConfigFile(mpicom_o,configFile,"roms2pop_file:",mapfile,"roms2pop_type:",maptype)
-   write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
+   if (master) write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
    call shr_mct_sMatPInitnc(sMatp_r2p,gsMap_r,gsMap_p,trim(mapfile),trim(maptype),mpicom_o)
 
    call shr_mct_queryConfigFile(mpicom_o,configFile,"pop2roms_file:",mapfile,"pop2roms_type:",maptype)
-   write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
+   if(master) write(o_logUnit,'(4a)') subName, "file = ",trim(mapfile)
    call shr_mct_sMatPInitnc(sMatp_p2r,gsMap_p,gsMap_r,trim(mapfile),trim(maptype),mpicom_o)
 
-   write(o_logUnit,'(2a)') subname,"Exit" ;  call shr_sys_flush(o_logUnit)
+   if(master) write(o_logUnit,'(2a)') subname,"Exit" 
 
 end subroutine ocpl_map_init
 
@@ -193,7 +197,7 @@ end subroutine ocpl_map_init
 ! !IROUTINE: ocpl_map_pop2roms
 !
 ! !DESCRIPTION:
-!     map data from pop to roms 
+!     map data from pop to roms
 !
 ! !INTERFACE:
 !
@@ -208,12 +212,12 @@ subroutine ocpl_map_pop2roms()
 
    use mod_param   , only: BOUNDS,             & ! roms internal data
                            globalISize0 => Lm, &
-                           globalJSize0 => Mm  
+                           globalJSize0 => Mm
    use mod_grid    , only: ROMS_GRID => GRID     ! roms internal data
    use mod_parallel, only: MyRank                ! roms internal data
    use grid        , only: pop_depth => zt       ! pop  internal data
- 
-!  integer(IN),parameter  :: nestID = 1    ! roms nest (grid/domain) #1  
+
+!  integer(IN),parameter  :: nestID = 1    ! roms nest (grid/domain) #1
 
 
 !EOP
@@ -233,7 +237,7 @@ subroutine ocpl_map_pop2roms()
    real(R8)    :: w1 ,w2              ! interp weight assigned to lower,upper pop levels
    real(R8)    :: F1 ,F2, Fr          ! pop data values and target roms data value
    real(R8)    :: depth_r             ! depth of roms point being interpolated to
-   real(R8),allocatable :: depth_p(:) ! depths of pop data 
+   real(R8),allocatable :: depth_p(:) ! depths of pop data
    real(R8)    :: zr,zp1,zp2          ! depth roms value and surrounding pop layers
    logical     :: do_mapping          ! flags that this local tile reqires mapping
    logical     :: first_call = .true. ! flags 1st-time setup operations
@@ -245,13 +249,11 @@ subroutine ocpl_map_pop2roms()
 
    character(*), parameter :: subName = "(ocpl_map_pop2roms) "
 
-   save
-
 !-----------------------------------------------------------------------------------------
-!  
+!
 !-----------------------------------------------------------------------------------------
 
-   write(o_logUnit,'(2a)') subname,"Enter" ;  call shr_sys_flush(o_logUnit)
+   if(master) write(o_logUnit,'(2a)') subname,"Enter" ;  call shr_sys_flush(o_logUnit)
    if (debug>0) write(o_logUnit,'(2a,i2)') subname,"debug level = ",debug
 
    !--------------------------------------------------------------------------------------
@@ -299,25 +301,25 @@ subroutine ocpl_map_pop2roms()
             kfld = mct_aVect_indexRA(p2x_2d_rc(k),"So_ssh" )
             xmin = minval(p2x_2d_rc(k)%rAttr(kfld,:))
             xmax = maxval(p2x_2d_rc(k)%rAttr(kfld,:))
-            write(o_logUnit,'(2a,i2,2es11.3)') subname,"2d map: k, rc ssh min,max = ",k,xmin,xmax 
+            if(master) write(o_logUnit,'(2a,i2,2es11.3)') subname,"2d map: k, rc ssh min,max = ",k,xmin,xmax
          else
-            write(o_logUnit,'(2a,i3,a)')       subName,"2d map: k = ",k," lsize = 0 => no mapping"
+            if(master) write(o_logUnit,'(2a,i3,a)')       subName,"2d map: k = ",k," lsize = 0 => no mapping"
          end if
       end if
    end do
 
    !--------------------------------------------------------------------------------------
    ! map 3d curtain fields: salt,temperature, u, v
-   ! 
+   !
    ! in the vertical column containing the target roms value location...
    ! np1 is the the pop layer immediately *above* the desired roms value
    ! np2 is the the pop layer immediately *below* the desired roms value, np2 = np + 1
    ! w1 is the weight assigned to the pop value at layer np1 and is in the range [0,1]
    ! w2 is the weight assigned to np2, w2 = (1 - w1)
-   ! roms_value = w1*pop_value(np1)  + w2*pop_value(np2) 
+   ! roms_value = w1*pop_value(np1)  + w2*pop_value(np2)
    !--------------------------------------------------------------------------------------
 
-   if (first_call) then ! one-time initializations 
+   if (first_call) then ! one-time initializations
       !--- pop depth array, for layer mid-point, in meters
       allocate(depth_p(nlev_p))
       depth_p(:) = 0.01_R8*pop_depth(:) ! convert cm -> m
@@ -353,7 +355,7 @@ subroutine ocpl_map_pop2roms()
             kfld = mct_aVect_indexRA(p2x_3d_rc(k,1),"So_temp" )
             xmin = minval(p2x_3d_pvert_rc(k,1)%rAttr(kfld,:))
             xmax = maxval(p2x_3d_pvert_rc(k,1)%rAttr(kfld,:))
-            write(o_logUnit,'(2a,i2,2es11.3)') subname,"3d map: k, pvert_rc SST min,max = ",k,xmin,xmax 
+            write(o_logUnit,'(2a,i2,2es11.3)') subname,"3d map: k, pvert_rc SST min,max = ",k,xmin,xmax
          end if
 
          !--- vertical interpolation to roms layers (local operation) -------------------
@@ -363,8 +365,8 @@ subroutine ocpl_map_pop2roms()
 
             do ij=1,lsize ! for each roms grid cell
 
-                !--- determine depth of roms target value 
-                if (k == k_Wcurtain) then        ! 
+                !--- determine depth of roms target value
+                if (k == k_Wcurtain) then        !
                    i = 1
                    j = ij + BOUNDS(nestID)%JstrR(MyRank) - 1
                 else if (k == k_Ncurtain) then
@@ -381,19 +383,19 @@ subroutine ocpl_map_pop2roms()
 
                 !--- determine interpolation weights of pop values surrounding roms target value
                 w1  = -1.0  ! an invalid value
-                w2  = -1.0   
+                w2  = -1.0
                 np2 = -1    ! an invalid value
-                np1 = -1     
-                if (     depth_r >= depth_p(nlev_p)) then ! roms deeper than pop 
+                np1 = -1
+                if (     depth_r >= depth_p(nlev_p)) then ! roms deeper than pop
                    np1 = nlev_p - 1
                    np2 = nlev_p
-                   w1  = 0.0_R8   
+                   w1  = 0.0_R8
                    w2  = 1.0_R8   ! all weight to lowest pop level
                 else if (depth_r <= depth_p(1)     ) then ! roms shallower than pop
                    np1 = 1
                    np2 = 2
                    w1  = 1.0_R8  ! all weight to shallowest pop level
-                   w2  = 0.0_R8  
+                   w2  = 0.0_R8
                 else                         ! find pop levels that surround roms point
                    do np = 1,nlev_p-1
                       if (depth_p(np) <= depth_r .and. depth_r <= depth_p(np+1)) then
@@ -401,7 +403,7 @@ subroutine ocpl_map_pop2roms()
                          np2 = np1 + 1   ! the deeper    layer
                          w2 = ( depth_p(np1) - depth_r     ) &
                             / ( depth_p(np1) - depth_p(np2))
-                         w1  = 1.0_R8 - w2  
+                         w1  = 1.0_R8 - w2
                          exit
                       endif
                    enddo
@@ -411,16 +413,16 @@ subroutine ocpl_map_pop2roms()
                 !--- apply interpolation weights ---
                 p2x_3d_rc(k,nr)%rAttr(:,ij) =  &
                        w1 * p2x_3d_pvert_rc(k,np1)%rAttr(:,ij) + &
-                       w2 * p2x_3d_pvert_rc(k,np2)%rAttr(:,ij) 
+                       w2 * p2x_3d_pvert_rc(k,np2)%rAttr(:,ij)
 
                 !--- document a sampling of interp specifics ---
                 if (debug>1 .and. ((nr==nlev_r .or. mod(nr-1,10)==0) &
                             .and.  (ij==lsize  .or. mod(ij-1,10)==0))  ) then
-                   zp1 = depth_p(np1) 
-                   zp2 = depth_p(np2) 
+                   zp1 = depth_p(np1)
+                   zp2 = depth_p(np2)
                    zr  = depth_r
                    kfld = k_p2x_3d_So_temp
-                   F1 = p2x_3d_pvert_rc(k,np1)%rAttr(kFld,ij) 
+                   F1 = p2x_3d_pvert_rc(k,np1)%rAttr(kFld,ij)
                    F2 = p2x_3d_pvert_rc(k,np2)%rAttr(kFld,ij)
                    Fr = p2x_3d_rc      (k,nr )%rAttr(kFld,ij)
                    write(o_logUnit,'(2a,i2,i3,2i4,2i3,2f5.2,3f7.1,3es11.2)') subName,&
@@ -431,12 +433,12 @@ subroutine ocpl_map_pop2roms()
             end do ! do ij - loop over roms grid cells
          end do ! do nr ~ loop over roms layers
          end if ! lsize > 0 ~ non-zero tile size
-         write(o_logUnit,'(2a,i3,a)') subName,"3d map: k = ",k," lsize = 0 => no mapping"
+         if(master) write(o_logUnit,'(2a,i3,a)') subName,"3d map: k = ",k," lsize = 0 => no mapping"
       end if ! do_mapping => curtain is active
 
    end do  ! do k=1,4  ~ over all four curtains: N,E,S,W
 
-   write(o_logUnit,'(2a)') subname,"Exit" ;  call shr_sys_flush(o_logUnit)
+   if(master) write(o_logUnit,'(2a)') subname,"Exit" 
 
 end subroutine ocpl_map_pop2roms
 
@@ -446,7 +448,7 @@ end subroutine ocpl_map_pop2roms
 ! !IROUTINE: ocpl_map_roms2pop
 !
 ! !DESCRIPTION:
-!     map data from roms to pop, for 3d restoring of pop to roms state 
+!     map data from roms to pop, for 3d restoring of pop to roms state
 !
 ! !INTERFACE:
 !
@@ -461,9 +463,9 @@ subroutine ocpl_map_roms2pop()
 
    use grid,         only: z_p         => zw     ! pop depth array
    use mod_grid,     only: ROMS_GRID   => GRID
-   use mod_param,    only: ROMS_BOUNDS => BOUNDS, & 
+   use mod_param,    only: ROMS_BOUNDS => BOUNDS, &
                            globalISize0 => Lm, &
-                           globalJSize0 => Mm  
+                           globalJSize0 => Mm
    use mod_parallel, only: MyRank
 
 !EOP
@@ -489,10 +491,10 @@ subroutine ocpl_map_roms2pop()
    character(*), parameter :: subName = "(ocpl_map_roms2pop) "
 
 !-----------------------------------------------------------------------------------------
-!  
+!
 !-----------------------------------------------------------------------------------------
- 
-   if (debug>0) write(o_logUnit,'(2a)') subname,"Enter" ;  call shr_sys_flush(o_logUnit)
+
+   if (master .or. debug>0) write(o_logUnit,'(2a)') subname,"Enter" 
 
    !--- for accessing roms arrays with (i,j) indexing ---
    iMin = ROMS_BOUNDS(nestID)%IstrR(MyRank)
@@ -502,20 +504,24 @@ subroutine ocpl_map_roms2pop()
    localISize = iMax - iMin + 1
    localJSize = jMax - jMin + 1
    LBi  = 1
-   LBj  = 1                              
+   LBj  = 1
    UBi  = globalISize0(nestID) + 1
    UBj  = globalJSize0(nestID) + 1
 
    !--- create weights that are 1.0 in roms interior, ramping down to 0.0 at roms boundary ---
    if (first_call) then
-      write(o_logUnit,'(2a,4i7)') subname,"roms grid:  local: LBi,LBj,UBi,UBj=",iMin,jMin,iMax,jMax
-      write(o_logUnit,'(2a,4i7)') subname,"roms grid, global: LBi,LBj,UBi,UBj=",LBi,LBj,UBi,UBj
+      if(master) then
+         write(o_logUnit,'(2a,4i7)') subname,"roms grid:  local: LBi,LBj,UBi,UBj=",iMin,jMin,iMax,jMax
+         write(o_logUnit,'(2a,4i7)') subname,"roms grid, global: LBi,LBj,UBi,UBj=",LBi,LBj,UBi,UBj
+      endif
       if ( mct_aVect_lSize(r2x_2d_r) == 0) then  ! local tile size = 0 (not data on this PE)
-         write(o_logUnit,'(2a)') subname,"create roms domain edge weights (this tile lsize = 0)" 
-         write(o_logUnit,'(2a)') subname,"roms edge weight min/max = N/A (lsize=0)"
+         if(master) then
+            write(o_logUnit,'(2a)') subname,"create roms domain edge weights (this tile lsize = 0)"
+            write(o_logUnit,'(2a)') subname,"roms edge weight min/max = N/A (lsize=0)"
+         endif
       else
-         write(o_logUnit,'(2a)') subname,"create roms domain edge weights" ;  call shr_sys_flush(o_logUnit)
-         do n = 1, mct_aVect_lSize(r2x_2d_r) ! loop over roms aVect(n), need corresponding roms global i,j 
+         if(master) write(o_logUnit,'(2a)') subname,"create roms domain edge weights" ;  call shr_sys_flush(o_logUnit)
+         do n = 1, mct_aVect_lSize(r2x_2d_r) ! loop over roms aVect(n), need corresponding roms global i,j
             i = mod(n-1,localISize) + iMin
             j = n/localISize        + jMin     ! requires/assumes fortran truncation
 
@@ -530,13 +536,13 @@ subroutine ocpl_map_roms2pop()
          if (debug>0 ) then
             xmin = minval(r2x_2d_r%rAttr(k_r2x_2d_wgts,:))
             xmax = maxval(r2x_2d_r%rAttr(k_r2x_2d_wgts,:))
-            write(o_logUnit,'(2a,2f6.3)') subname,"roms edge weight min/max = ",xmin,xmax 
+            write(o_logUnit,'(2a,2f6.3)') subname,"roms edge weight min/max = ",xmin,xmax
             call shr_sys_flush(o_logUnit)
          end if
       end if
 
       !----- map merge weights: roms -> pop -----
-      write(o_logUnit,'(2a)') subname,"map merge weights: roms -> pop" ;  call shr_sys_flush(o_logUnit)
+      if(master) write(o_logUnit,'(2a)') subname,"map merge weights: roms -> pop" 
       call mct_sMat_avMult(r2x_2d_r, sMatp_r2p, r2x_2d_p,vector=usevector)
 
       if (debug>0 ) then
@@ -545,10 +551,10 @@ subroutine ocpl_map_roms2pop()
          else
             xmin = minval(r2x_2d_p%rAttr(k_r2x_2d_wgts,:))
             xmax = maxval(r2x_2d_p%rAttr(k_r2x_2d_wgts,:))
-            write(o_logUnit,'(2a,2f6.3)') subname,"pop  edge weight min/max = ",xmin,xmax 
+            write(o_logUnit,'(2a,2f6.3)') subname,"pop  edge weight min/max = ",xmin,xmax
          end if
          call shr_sys_flush(o_logUnit)
-      end if  
+      end if
 
    end if
    first_call = .false.
@@ -556,7 +562,7 @@ subroutine ocpl_map_roms2pop()
    !--------------------------------------------------------------------------------------
    ! Step 1) vertical interpolation: roms levels -> pop levels
    ! Notes:
-   ! o need roms(i,j) indicies to access internal roms cell depth array 
+   ! o need roms(i,j) indicies to access internal roms cell depth array
    ! o  "upper bound" means a roms level *deeper* than the target pop level
    ! o for pop,  level k+1 is deeper    than level k
    ! o for roms, level k+1 is shallower than level k
@@ -577,7 +583,7 @@ subroutine ocpl_map_roms2pop()
    end if
 
    do k_p = 1,nLev_rp                    ! loop over pop levels (those involved in pop restoring)
-   do n = 1,mct_aVect_lSize(r2x_3d_r(1)) ! loop over aVect(n), need corresponding roms global i,j 
+   do n = 1,mct_aVect_lSize(r2x_3d_r(1)) ! loop over aVect(n), need corresponding roms global i,j
       i = mod(n-1,localISize) + iMin
       j = n/localISize        + jMin     ! requires/assumes fortran truncation
 
@@ -591,7 +597,7 @@ subroutine ocpl_map_roms2pop()
       end if
 
       !----- if( pop is shallower than roms) then (restore down to this pop level) -----
-      if (z_p(k_p) <= zMax_r) r2x_2d_r%rAttr(k_r2x_2d_reslev,n) = float(k_p) 
+      if (z_p(k_p) <= zMax_r) r2x_2d_r%rAttr(k_r2x_2d_reslev,n) = float(k_p)
 
       if (z_p(k_p) >= zMax_r) then
          !----- target pop level deeper than max roms level => use max roms level -----
@@ -619,7 +625,7 @@ subroutine ocpl_map_roms2pop()
             z0_r = z1_r                                        ! z1_r is NOT an UB, look deeper
          end do
 
-         !----- compute UB & LB interp weights ----- z0_r < z_p <= z1_r 
+         !----- compute UB & LB interp weights ----- z0_r < z_p <= z1_r
          k0_r = k_r                                       ! LB roms index
          k1_r = k_r - 1                                   ! UB roms index
          f1   = (z_p(k_p) - z0_r)/(z1_r - z0_r)           ! fraction for UB field value
@@ -647,20 +653,20 @@ subroutine ocpl_map_roms2pop()
      end if
 
    end do ! n   = 1,mct_aVect_lsize(r2x_3d_r)
-   end do ! k_p = 1,nLev_rp 
+   end do ! k_p = 1,nLev_rp
 
 
    !--------------------------------------------------------------------------------------
    ! Step 2) horizonal interpolation: roms -> pop  (all data at pop vertical levals)
    !--------------------------------------------------------------------------------------
-   if (debug>0) write(o_logUnit,'(2a)') subname,"map 3d horizontal" ;  call shr_sys_flush(o_logUnit)
+   if (debug>0) write(o_logUnit,'(2a)') subname,"map 3d horizontal" 
 
    call mct_sMat_avMult(r2x_2d_r, sMatp_r2p, r2x_2d_p,vector=usevector)
 
-   do k_p = 1,nLev_rp  
-      if (debug>0) write(o_logUnit,'(2a,i3)') subname,"map 3d horizontal, level=",k_p;  call shr_sys_flush(o_logUnit)
+   do k_p = 1,nLev_rp
+      if (debug>0) write(o_logUnit,'(2a,i3)') subname,"map 3d horizontal, level=",k_p
       call mct_sMat_avMult(r2x_3d_rp(k_p), sMatp_r2p, r2x_3d_p(k_p),vector=usevector)
-   end do 
+   end do
 
 end subroutine ocpl_map_roms2pop
 
