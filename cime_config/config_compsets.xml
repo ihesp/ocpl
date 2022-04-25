@@ -36,16 +36,16 @@
   </help>
 
   <!-- C compsets -->
-<!--
+
   <compset>
     <alias>C_OC</alias>
     <lname>2000_DATM%NYF_SLND_DICE%SSMI_OCPL_DROF%JRA_SGLC_SWAV</lname>
   </compset>
--->
-  <compset>
+
+<!--  <compset>
     <alias>C_OC</alias>
     <lname>2000_DATM%NYF_SLND_DICE%SSMI_OCPL_SROF_SGLC_SWAV</lname>
-  </compset>
+  </compset> -->
 
 
   <!-- ENTRIES -->

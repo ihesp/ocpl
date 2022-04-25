@@ -81,7 +81,7 @@
   <entry id="OCN_TRACER_MODULES">
     <type>char</type>
     <valid_values></valid_values>
-    <default_value>iage</default_value>
+    <default_value></default_value>
     <values modifier='merge'>
       <value compset="^HIST">cfc sf6</value>
       <value compset="^5505">cfc sf6</value>
